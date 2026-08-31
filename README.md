@@ -11,13 +11,6 @@ npm install
 npm run dev
 ```
 
-## Multiplayer (local network)
+## Multiplayer
 
-Multiplayer uses a WebSocket server on your machine — it is not included in the GitHub Pages build.
-
-```bash
-npm run server   # terminal 1
-npm run dev      # terminal 2
-```
-
-One player hosts and shares the room code; the other joins.
+Host a game and share the room code — your friend joins directly in their browser. Works from the public link; no server setup needed.

@@ -1,23 +1,21 @@
 import type { ClientAction } from '../game/applyGameAction'
 import type { GameState } from '../game/types'
 
-export type ServerMessage =
-  | { type: 'hosted'; code: string; playerId: 1 }
-  | { type: 'joined'; code: string; playerId: 2 }
-  | { type: 'guest_joined' }
-  | { type: 'waiting'; message: string }
+export type WireMessage =
   | { type: 'state'; state: GameState }
-  | { type: 'error'; message: string }
+  | { type: 'action'; action: ClientAction; playerId: 1 | 2 }
 
-export type ClientMessage =
-  | { type: 'host' }
-  | { type: 'join'; code: string }
-  | { type: 'action'; action: ClientAction }
+const PEER_PREFIX = 'cardclash-'
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
-export function getMultiplayerWsUrl(): string {
-  const envUrl = import.meta.env.VITE_WS_URL as string | undefined
-  if (envUrl) return envUrl
-  if (import.meta.env.DEV) return 'ws://localhost:3001'
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${protocol}//${window.location.hostname}:3001`
+export function generateRoomCode(): string {
+  let code = ''
+  for (let i = 0; i < 6; i++) {
+    code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]
+  }
+  return code
+}
+
+export function peerIdFromCode(code: string): string {
+  return `${PEER_PREFIX}${code.trim().toUpperCase()}`
 }
