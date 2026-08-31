@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 
-const BUILD_ID = '2026-08-31-mp3'
+const BUILD_ID = '2026-08-31-mp4'
 const buildKey = 'card-clash-build'
 const previousBuild = localStorage.getItem(buildKey)
 if (previousBuild && previousBuild !== BUILD_ID) {

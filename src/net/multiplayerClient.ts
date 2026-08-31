@@ -108,7 +108,7 @@ export class MultiplayerClient {
         this.hostState = createInitialGame()
         this.callbacks.onHosted(code)
         this.callbacks.onWaiting('Share the code — waiting for guest…')
-        this.callbacks.onState(this.hostState)
+        this.pushState(1)
         settled = true
         resolve(code)
       })
@@ -204,7 +204,7 @@ export class MultiplayerClient {
     if (this.playerId === 1) {
       if (!this.hostState) return
       this.hostState = applyGameAction(this.hostState, 1, action)
-      this.callbacks.onState(this.hostState)
+      this.pushState(1)
       this.sendStateToGuest()
       return
     }
@@ -251,7 +251,7 @@ export class MultiplayerClient {
       }
       if (msg.type === 'action' && this.playerId === 1 && this.hostState) {
         this.hostState = applyGameAction(this.hostState, msg.playerId, msg.action)
-        this.callbacks.onState(this.hostState)
+        this.pushState(1)
         this.sendStateToGuest()
       }
     })
@@ -261,6 +261,11 @@ export class MultiplayerClient {
         this.callbacks.onDisconnect()
       }
     })
+  }
+
+  private pushState(viewerId: 1 | 2) {
+    if (!this.hostState) return
+    this.callbacks.onState(filterGameStateForPlayer(this.hostState, viewerId))
   }
 
   private sendStateToGuest() {

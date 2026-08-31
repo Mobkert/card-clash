@@ -275,7 +275,9 @@ export function PlayScreen({
         />
       </div>
 
-      {abilityModalCharacter && (
+      {abilityModalCharacter &&
+        game.abilityModal &&
+        (!isOnline || game.abilityModal.playerId === myPlayerId) && (
         <AbilityModal
           character={abilityModalCharacter}
           onSelect={(id) => dispatch({ type: 'SELECT_ABILITY', abilityId: id })}
