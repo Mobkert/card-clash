@@ -1,0 +1,264 @@
+.objectives-reveal {
+  position: fixed;
+  inset: 0;
+  z-index: 210;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  pointer-events: auto;
+}
+
+.objectives-reveal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(6px);
+}
+
+.objectives-reveal__pop {
+  position: relative;
+  z-index: 2;
+  width: min(440px, 92vw);
+  padding: 28px 24px 22px;
+  text-align: center;
+  border-radius: 24px;
+  border: 4px solid #fff;
+  box-shadow:
+    0 0 0 4px rgba(0, 0, 0, 0.35),
+    0 18px 40px rgba(0, 0, 0, 0.45);
+  animation: objective-pop-in 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.objectives-reveal__pop--p1 {
+  background: linear-gradient(145deg, #1e3a5f, #2563eb 45%, #60a5fa);
+}
+
+.objectives-reveal__pop--p2 {
+  background: linear-gradient(145deg, #5f1e2e, #dc2626 45%, #f87171);
+}
+
+.objectives-reveal__pop--random {
+  background: linear-gradient(145deg, #4a3b00, #ca8a04 40%, #fde047);
+  color: #1a1200;
+}
+
+.objectives-reveal__pop--random .objectives-reveal__pop-kicker,
+.objectives-reveal__pop--random .objectives-reveal__pop-label,
+.objectives-reveal__pop--random .objectives-reveal__pop-target,
+.objectives-reveal__pop--random .objectives-reveal__pop-counter {
+  color: #1a1200;
+  text-shadow: none;
+}
+
+@keyframes objective-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-8deg);
+  }
+  60% {
+    transform: scale(1.08) rotate(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.objectives-reveal__pop-star {
+  position: absolute;
+  font-size: 1.4rem;
+  color: #fff;
+  opacity: 0.85;
+  animation: star-spin 1.2s ease-in-out infinite;
+}
+
+.objectives-reveal__pop-star--1 {
+  top: 10px;
+  left: 14px;
+}
+
+.objectives-reveal__pop-star--2 {
+  top: 8px;
+  right: 16px;
+  animation-delay: 0.2s;
+}
+
+.objectives-reveal__pop-star--3 {
+  bottom: 12px;
+  right: 24px;
+  animation-delay: 0.35s;
+}
+
+@keyframes star-spin {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.2);
+  }
+}
+
+.objectives-reveal__pop-kicker {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.objectives-reveal__pop-label {
+  margin: 0 0 10px;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.objectives-reveal__pop-target {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.objectives-reveal__pop-counter {
+  margin: 14px 0 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.objectives-reveal__animating {
+  position: absolute;
+  bottom: 32px;
+  z-index: 2;
+  margin: 0;
+  color: #aaa;
+  font-size: 0.95rem;
+}
+
+.objectives-reveal__summary {
+  position: relative;
+  z-index: 2;
+  width: min(520px, 100%);
+  background: var(--ui-header-bg, rgba(30, 30, 40, 0.96));
+  border: 2px solid rgba(255, 215, 0, 0.35);
+  border-radius: calc(var(--ui-radius, 14px) * 1.2);
+  padding: 24px 26px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  animation: objective-pop-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.objectives-reveal__summary-title {
+  margin: 0 0 8px;
+  font-size: 1.45rem;
+  color: var(--ui-accent-text, #ffd700);
+  text-align: center;
+}
+
+.objectives-reveal__summary-hint {
+  margin: 0 0 18px;
+  text-align: center;
+  color: #bbb;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.objectives-reveal__list {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.objectives-reveal__item {
+  padding: 12px 14px;
+  border-radius: calc(var(--ui-radius, 14px) * 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.objectives-reveal__item--p1 {
+  border-color: rgba(96, 165, 250, 0.45);
+}
+
+.objectives-reveal__item--p2 {
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.objectives-reveal__item--random {
+  border-color: rgba(253, 224, 71, 0.45);
+}
+
+.objectives-reveal__item-tag {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #aaa;
+}
+
+.objectives-reveal__item-label {
+  font-size: 0.92rem;
+  color: #eee;
+  line-height: 1.35;
+}
+
+.objectives-reveal__ready-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.objectives-reveal__ready {
+  font-size: 0.88rem;
+  color: #888;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.objectives-reveal__ready--done {
+  color: #81c784;
+  border-color: rgba(129, 199, 132, 0.45);
+  background: rgba(129, 199, 132, 0.12);
+}
+
+.objectives-reveal__next {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  margin: 0 auto;
+  padding: 12px 24px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  border-radius: calc(var(--ui-radius, 14px) * 0.6);
+  background: linear-gradient(135deg, #ffd700, #ff9800);
+  color: #1a1a1a;
+}
+
+.objectives-reveal__next:hover {
+  filter: brightness(1.08);
+}
+
+.objectives-reveal__waiting {
+  text-align: center;
+  margin: 0;
+  color: #aaa;
+  font-size: 0.95rem;
+}

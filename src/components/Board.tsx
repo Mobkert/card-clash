@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { forwardRef, useEffect, useState } from 'react'
 import type { BoardSlot, VfxEvent } from '../game/types'
 import { getTemplate } from '../game/cards'
 import { get2x2AoESlots, getPlusAoESlots, isTargetBlockedByCharacter } from '../game/status'
@@ -22,7 +22,8 @@ interface BoardProps {
   onSlotClick: (row: number, col: number) => void
 }
 
-export function Board({
+export const Board = forwardRef<HTMLDivElement, BoardProps>(function Board(
+  {
   slots,
   playerId,
   label,
@@ -37,7 +38,9 @@ export function Board({
   boardVfx = [],
   onBoardVfxDone,
   onSlotClick,
-}: BoardProps) {
+  },
+  ref,
+) {
   const rows = [0, 1, 2, 3]
   const cols = [0, 1]
   const [hoveredRow, setHoveredRow] = useState<number | null>(null)
@@ -85,7 +88,7 @@ export function Board({
   }, [columnTargeting])
 
   return (
-    <div className={`board board--p${playerId}${targeting ? ' board--targeting' : ''}`}>
+    <div ref={ref} className={`board board--p${playerId}${targeting ? ' board--targeting' : ''}`}>
       <h3 className="board__label">{label}</h3>
       {laneTargeting && (
         <p className="board__lane-hint">Hover a row — entire lane glows</p>
@@ -207,4 +210,4 @@ export function Board({
       </div>
     </div>
   )
-}
+})

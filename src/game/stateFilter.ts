@@ -1,3 +1,4 @@
+import { emptyObjectiveStats } from './objectives'
 import type { CardInstance, GameState, PlayerState } from './types'
 
 const HIDDEN_TEMPLATE = '__hidden__'
@@ -6,12 +7,15 @@ function hideCard(_card: CardInstance, index: number, prefix: string): CardInsta
   return { instanceId: `${prefix}_${index}`, templateId: HIDDEN_TEMPLATE }
 }
 
-function hidePlayerSecrets(player: PlayerState): PlayerState {
+function hidePlayerSecrets(player: PlayerState, viewerId: 1 | 2): PlayerState {
+  const isSelf = player.id === viewerId
   return {
     ...player,
-    hand: player.hand.map((c, i) => hideCard(c, i, 'hidden_hand')),
-    deck: player.deck.map((c, i) => hideCard(c, i, 'hidden_deck')),
-    eliminated: player.eliminated.map((c, i) => hideCard(c, i, 'hidden_elim')),
+    hand: isSelf ? player.hand : player.hand.map((c, i) => hideCard(c, i, 'hidden_hand')),
+    deck: isSelf ? player.deck : player.deck.map((c, i) => hideCard(c, i, 'hidden_deck')),
+    eliminated: isSelf ? player.eliminated : player.eliminated.map((c, i) => hideCard(c, i, 'hidden_elim')),
+    objectives: isSelf ? player.objectives : player.objectives.map((obj) => ({ ...obj, progress: 0, completed: false })),
+    objectiveStats: isSelf ? player.objectiveStats : emptyObjectiveStats(),
   }
 }
 
@@ -57,7 +61,9 @@ function sanitizeMessage(state: GameState, viewerId: 1 | 2): string {
 export function filterGameStateForPlayer(state: GameState, viewerId: 1 | 2): GameState {
   const [p1, p2] = state.players
   const players: [PlayerState, PlayerState] =
-    viewerId === 1 ? [p1, hidePlayerSecrets(p2)] : [hidePlayerSecrets(p1), p2]
+    viewerId === 1
+      ? [p1, hidePlayerSecrets(p2, viewerId)]
+      : [hidePlayerSecrets(p1, viewerId), p2]
 
   let selectedCard = state.selectedCard
   if (selectedCard) {

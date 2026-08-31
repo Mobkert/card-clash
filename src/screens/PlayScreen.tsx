@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { getTemplate } from '../game/cards'
-import { clearRefillEffect, createInitialGame } from '../game/engine'
+import { clearRefillEffect, createInitialGame, rematchGame } from '../game/engine'
 import type { ClientAction } from '../game/applyGameAction'
 import { applyGameAction } from '../game/applyGameAction'
 import type { GameState } from '../game/types'
@@ -11,6 +11,11 @@ import { Hand } from '../components/Hand'
 import { TradeModal } from '../components/TradeModal'
 import { CounterPromptModal } from '../components/CounterPrompt'
 import { DoubleTroubleBadge } from '../components/DoubleTroubleBadge'
+import { ObjectivesIntro } from '../components/ObjectivesIntro'
+import { ObjectivesReveal } from '../components/ObjectivesReveal'
+import { ObjectivesPanel } from '../components/ObjectivesPanel'
+import { VictoryCinematic } from '../components/VictoryCinematic'
+import { VictoryScreen } from '../components/VictoryScreen'
 import { ScreenVfx } from '../components/vfx/ScreenVfx'
 import { hasBuff } from '../game/status'
 import { BOARD_VFX_TYPES } from '../components/vfx/vfxConfig'
@@ -44,6 +49,14 @@ export function PlayScreen({
     p1: [],
     p2: [],
   })
+  const [handPreviewId, setHandPreviewId] = useState<string | null>(null)
+  const [showVictoryMenu, setShowVictoryMenu] = useState(false)
+  const p1BoardRef = useRef<HTMLDivElement>(null)
+  const p2BoardRef = useRef<HTMLDivElement>(null)
+  const arenaWrapRef = useRef<HTMLDivElement>(null)
+
+  const gameFinished = game.phase === 'finished' && game.winner != null
+  const victoryCinematicActive = gameFinished && !showVictoryMenu
 
   const [p1, p2] = game.players
 
@@ -80,6 +93,63 @@ export function PlayScreen({
 
     return () => clearTimeout(timer)
   }, [game.refillEffect, isOnline, dispatch])
+
+  useEffect(() => {
+    setHandPreviewId(null)
+  }, [actorId, game.phase])
+
+  useEffect(() => {
+    if (!gameFinished) setShowVictoryMenu(false)
+  }, [gameFinished, game.winner])
+
+  useEffect(() => {
+    if (isOnline) return
+
+    setControllingPlayer((current) => {
+      if (game.counterPrompt) return game.counterPrompt.defenderId
+
+      if (game.phase === 'objectives') {
+        if (!game.objectivePicks[1]) return 1
+        if (!game.objectivePicks[2]) return 2
+        return current
+      }
+
+      if (game.phase === 'objective_reveal') {
+        if (!game.objectivesAck[1]) return 1
+        if (!game.objectivesAck[2]) return 2
+        return current
+      }
+
+      if (game.phase === 'playing') return game.activePlayer
+
+      return current
+    })
+  }, [
+    isOnline,
+    game.phase,
+    game.activePlayer,
+    game.objectivePicks[1],
+    game.objectivePicks[2],
+    game.objectivesAck[1],
+    game.objectivesAck[2],
+    game.counterPrompt?.defenderId,
+  ])
+
+  useEffect(() => {
+    if (game.phase !== 'objectives' && game.phase !== 'objective_reveal') return
+
+    const tick = () => {
+      if (isOnline) {
+        dispatch({ type: 'TICK_OBJECTIVES' })
+      } else {
+        setLocalGame((s) => applyGameAction(s, 1, { type: 'TICK_OBJECTIVES' }))
+      }
+    }
+
+    tick()
+    const id = window.setInterval(tick, 500)
+    return () => window.clearInterval(id)
+  }, [game.phase, game.objectivesDeadlineMs, isOnline, dispatch])
 
   const selectedId = game.selectedCard?.instanceId ?? null
   const selectedTemplate = game.selectedCard ? getTemplate(game.selectedCard.templateId) : null
@@ -153,9 +223,22 @@ export function PlayScreen({
     return slot?.character ?? null
   })()
 
+  const viewerId = isOnline ? myPlayerId : actorId
+  const ackPlayerId = isOnline ? myPlayerId : actorId
+  const phaseLabel =
+    game.phase === 'setup'
+      ? 'Setup Mode'
+      : game.phase === 'objectives'
+        ? 'Draft Objectives'
+        : game.phase === 'objective_reveal'
+          ? 'Reveal Objectives'
+        : game.phase === 'finished'
+          ? 'Game Over'
+          : `Player ${game.activePlayer}'s Turn`
+
   return (
     <div
-      className={`play play--${theme.uiVariant}`}
+      className={`play play--${theme.uiVariant}${victoryCinematicActive ? ' play--victory-cinematic' : ''}`}
       style={themeStyle(theme)}
       data-theme-name={theme.name}
     >
@@ -174,9 +257,7 @@ export function PlayScreen({
               {myPlayerId === 1 ? 'Host · Player 1' : 'Guest · Player 2'}
             </span>
           )}
-          <span className={`play__phase play__phase--${game.phase}`}>
-            {game.phase === 'setup' ? 'Setup Mode' : `Player ${game.activePlayer}'s Turn`}
-          </span>
+          <span className={`play__phase play__phase--${game.phase}`}>{phaseLabel}</span>
           {showActiveDoubleTrouble && <DoubleTroubleBadge active />}
           <span className="play__message">
             {game.message}
@@ -192,7 +273,7 @@ export function PlayScreen({
         )}
       </header>
 
-      {!isOnline && (
+      {!isOnline && game.phase === 'setup' && (
       <div className="play__player-tabs">
         <button
           type="button"
@@ -211,8 +292,23 @@ export function PlayScreen({
       </div>
       )}
 
-      <div className="play__arena">
+      {!isOnline && game.phase !== 'setup' && game.phase !== 'finished' && (
+        <div className="play__local-active" aria-live="polite">
+          Now playing as <strong>Player {controllingPlayer}</strong>
+        </div>
+      )}
+
+      <div
+        ref={arenaWrapRef}
+        className={`play__arena-wrap${victoryCinematicActive ? ' play__arena-wrap--victory' : ''}`}
+      >
+        {game.phase === 'playing' && (!isOnline || viewerId === 1) && (
+          <ObjectivesPanel objectives={p1.objectives} side="left" showRaceHint={!isOnline} />
+        )}
+
+        <div className="play__arena">
         <Board
+          ref={p1BoardRef}
           slots={p1.board}
           playerId={1}
           label="Player 1"
@@ -256,6 +352,7 @@ export function PlayScreen({
         </div>
 
         <Board
+          ref={p2BoardRef}
           slots={p2.board}
           playerId={2}
           label="Player 2"
@@ -273,7 +370,62 @@ export function PlayScreen({
             dispatch({ type: 'BOARD_CLICK', boardPlayerId: 2, row, col })
           }}
         />
+        </div>
+
+        {game.phase === 'playing' && (!isOnline || viewerId === 2) && (
+          <ObjectivesPanel objectives={p2.objectives} side="right" showRaceHint={!isOnline} />
+        )}
       </div>
+
+      {game.phase === 'objectives' && (
+        <ObjectivesIntro
+          myPlayerId={ackPlayerId}
+          draftOptions={game.objectiveDraftOptions}
+          picks={game.objectivePicks}
+          deadlineMs={game.objectivesDeadlineMs}
+          isOnline={isOnline}
+          onPick={(objectiveId) => dispatch({ type: 'PICK_OBJECTIVE', objectiveId })}
+        />
+      )}
+
+      {game.phase === 'objective_reveal' && (
+        <ObjectivesReveal
+          myPlayerId={ackPlayerId}
+          matchObjectives={p1.objectives}
+          picks={game.objectivePicks}
+          randomPickId={game.objectiveRandomPick}
+          objectivesAck={game.objectivesAck}
+          deadlineMs={game.objectivesDeadlineMs}
+          isOnline={isOnline}
+          onAck={() => dispatch({ type: 'ACK_OBJECTIVE_REVEAL' })}
+        />
+      )}
+
+      {victoryCinematicActive && game.winner != null && (
+        <VictoryCinematic
+          winnerId={game.winner}
+          boardRef={game.winner === 1 ? p1BoardRef : p2BoardRef}
+          arenaWrapRef={arenaWrapRef}
+          onComplete={() => setShowVictoryMenu(true)}
+        />
+      )}
+
+      {showVictoryMenu && game.winner != null && (
+        <VictoryScreen
+          winnerId={game.winner}
+          isOnline={isOnline}
+          myPlayerId={isOnline ? myPlayerId : viewerId}
+          canRematch={!isOnline || myPlayerId === 1}
+          onRematch={() => {
+            if (isOnline) {
+              dispatch({ type: 'REMATCH' })
+            } else {
+              setLocalGame(rematchGame(game))
+            }
+          }}
+          onLeave={onBack}
+        />
+      )}
 
       {abilityModalCharacter &&
         game.abilityModal &&
@@ -360,10 +512,13 @@ export function PlayScreen({
                     cards={player.hand}
                     selectedId={controlsPlayer(pid) ? selectedId : null}
                     newlyDrawnIds={controlsPlayer(pid) ? newlyDrawnIds[key] : []}
-                    onSelect={(card) =>
-                      controlsPlayer(pid) &&
+                    canInspect={controlsPlayer(pid)}
+                    previewId={controlsPlayer(pid) ? handPreviewId : null}
+                    onPreviewChange={controlsPlayer(pid) ? setHandPreviewId : () => {}}
+                    onSelect={(card) => {
+                      if (!controlsPlayer(pid)) return
                       dispatch({ type: 'SELECT_CARD', cardInstanceId: card.instanceId })
-                    }
+                    }}
                     onUsePassive={
                       controlsPlayer(pid) && isPassiveSelected
                         ? () => dispatch({ type: 'USE_PASSIVE' })

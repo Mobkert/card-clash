@@ -1,0 +1,205 @@
+.objectives-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+  padding: 24px;
+}
+
+.objectives-intro__card {
+  width: min(720px, 100%);
+  background: var(--ui-header-bg, rgba(30, 30, 40, 0.95));
+  border: 1px solid var(--ui-panel-border, rgba(255, 255, 255, 0.18));
+  border-radius: calc(var(--ui-radius, 14px) * 1.2);
+  padding: 24px 28px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+}
+
+.objectives-intro__heading {
+  margin: 0 0 8px;
+  font-size: 1.5rem;
+  color: var(--ui-accent-text, #ffd700);
+}
+
+.objectives-intro__hint {
+  margin: 0 0 20px;
+  color: #bbb;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.objectives-intro__panels {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.objectives-intro__ready-row {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 16px 0 20px;
+}
+
+.objectives-intro__player-ready {
+  font-size: 0.9rem;
+  color: #888;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.objectives-intro__player-ready--done {
+  color: #81c784;
+  border-color: rgba(129, 199, 132, 0.45);
+  background: rgba(129, 199, 132, 0.12);
+}
+
+@media (min-width: 560px) {
+  .objectives-intro__panels {
+    flex-direction: row;
+  }
+
+  .objectives-intro__player-block {
+    flex: 1;
+  }
+}
+
+.objectives-intro__player-block h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.objectives-intro__ready {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #81c784;
+  background: rgba(129, 199, 132, 0.15);
+  border: 1px solid rgba(129, 199, 132, 0.4);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.objectives-intro__opp-status {
+  margin: 0;
+  color: #90caf9;
+  font-size: 0.95rem;
+  align-self: center;
+}
+
+.objectives-intro__next {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  margin: 0 auto;
+  padding: 12px 24px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  border-radius: calc(var(--ui-radius, 14px) * 0.6);
+  background: linear-gradient(135deg, #ffd700, #ff9800);
+  color: #1a1a1a;
+}
+
+.objectives-intro__next:hover {
+  filter: brightness(1.08);
+}
+
+.objectives-intro__waiting {
+  text-align: center;
+  margin: 0;
+  color: #aaa;
+  font-size: 0.95rem;
+}
+
+.objectives-intro__card--draft {
+  width: min(820px, 100%);
+}
+
+.objectives-draft__grid {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.objectives-draft__option {
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: calc(var(--ui-radius, 14px) * 0.55);
+  color: #ddd;
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+
+.objectives-draft__option:hover:not(:disabled) {
+  border-color: var(--ui-accent, #ffd700);
+  background: rgba(255, 215, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.objectives-draft__option--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.objectives-draft__option--p1 {
+  border-color: rgba(100, 181, 246, 0.55);
+  background: rgba(100, 181, 246, 0.1);
+}
+
+.objectives-draft__option--p2 {
+  border-color: rgba(255, 138, 128, 0.55);
+  background: rgba(255, 138, 128, 0.1);
+}
+
+.objectives-draft__option--mine {
+  box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.35);
+}
+
+.objectives-draft__label {
+  flex: 1;
+}
+
+.objectives-draft__badge {
+  align-self: flex-start;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ccc;
+}
+
+.objectives-draft__badge--you {
+  background: rgba(255, 215, 0, 0.2);
+  color: #ffd700;
+}

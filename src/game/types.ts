@@ -105,6 +105,8 @@ export interface CharacterStatus {
   turnsRemaining: number
   damagePerTurn?: number
   permanent?: boolean
+  /** Player who applied this status — used for objective damage credit on DOT/recoil. */
+  appliedBy?: 1 | 2
 }
 
 export interface BoardCharacter {
@@ -174,9 +176,11 @@ export interface PlayerState {
   damageTakenMultiplier: number
   damageDealtMultiplier: number
   cooldownReduction: number
+  objectives: PlayerObjective[]
+  objectiveStats: PlayerObjectiveStats
 }
 
-export type GamePhase = 'setup' | 'playing'
+export type GamePhase = 'setup' | 'objectives' | 'objective_reveal' | 'playing' | 'finished'
 
 export type TargetMode =
   | 'enemy_character'
@@ -251,6 +255,23 @@ export interface CounterPrompt {
 /** @deprecated use CounterPrompt */
 export type MirrorPrompt = CounterPrompt & { attackCard: CardInstance }
 
+export interface PlayerObjective {
+  id: string
+  label: string
+  target: number
+  progress: number
+  completed: boolean
+}
+
+export interface PlayerObjectiveStats {
+  eliminations: number
+  attacks_played: number
+  specials_played: number
+  damage_dealt: number
+  abilities_used: number
+  chars_placed: number
+}
+
 export interface TradeChoicePrompt {
   playerId: 1 | 2
   passiveCard: CardInstance
@@ -274,6 +295,12 @@ export interface GameState {
   refillEffect: RefillEffect | null
   vfxQueue: VfxEvent[]
   message: string
+  objectiveDraftOptions: PlayerObjective[]
+  objectivePicks: { 1: string | null; 2: string | null }
+  objectiveRandomPick: string | null
+  objectivesAck: { 1: boolean; 2: boolean }
+  objectivesDeadlineMs: number | null
+  winner: 1 | 2 | null
 }
 
 export const BOARD_ROWS = 4

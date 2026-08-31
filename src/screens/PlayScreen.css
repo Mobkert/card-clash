@@ -74,6 +74,55 @@
   color: var(--ui-accent-text, #ffd700);
 }
 
+.play__arena-wrap--victory {
+  position: relative;
+  z-index: 1;
+}
+
+.play--victory-cinematic .play__header,
+.play--victory-cinematic .play__player-tabs,
+.play--victory-cinematic .play__local-active,
+.play--victory-cinematic .play__players,
+.play--victory-cinematic .play__locked-cards {
+  opacity: 0.4;
+  filter: blur(1.5px) saturate(0.75);
+  transition: opacity 1.8s ease, filter 1.8s ease;
+  pointer-events: none;
+}
+
+.play--victory-cinematic .play__arena-wrap--victory .play__arena {
+  animation: victory-arena-slowzoom 2.4s cubic-bezier(0.25, 0.85, 0.35, 1) forwards;
+  will-change: transform, filter;
+}
+
+@keyframes victory-arena-slowzoom {
+  from {
+    transform: scale(1);
+    filter: saturate(1) brightness(1);
+  }
+  to {
+    transform: scale(1.55);
+    filter: saturate(1.08) brightness(1.05);
+  }
+}
+
+.play__arena-wrap {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.play__arena-wrap .play__arena {
+  flex: 1;
+  min-width: 0;
+}
+
+.play__phase--objectives {
+  color: #90caf9;
+}
+
 .play__phase--playing {
   color: #4caf50;
 }
@@ -120,6 +169,20 @@
 .play__tab--active {
   background: var(--ui-accent-soft, rgba(255, 215, 0, 0.15));
   border-color: var(--ui-accent, #ffd700);
+  color: var(--ui-accent-text, #ffd700);
+}
+
+.play__local-active {
+  align-self: center;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(255, 215, 0, 0.12);
+  border: 1px solid rgba(255, 215, 0, 0.35);
+  color: #eee;
+  font-size: 0.92rem;
+}
+
+.play__local-active strong {
   color: var(--ui-accent-text, #ffd700);
 }
 

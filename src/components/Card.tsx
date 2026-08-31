@@ -1,4 +1,5 @@
-import { getTemplate } from '../game/cards'
+import type { MouseEvent } from 'react'
+import { getCardUsageHint, getTemplate } from '../game/cards'
 import { isHiddenCard } from '../game/stateFilter'
 import type { CardInstance } from '../game/types'
 import './Card.css'
@@ -6,11 +7,13 @@ import './Card.css'
 interface CardProps {
   card: CardInstance
   selected?: boolean
+  previewing?: boolean
   onClick?: () => void
+  onContextMenu?: (event: MouseEvent) => void
   small?: boolean
 }
 
-export function Card({ card, selected, onClick, small }: CardProps) {
+export function Card({ card, selected, previewing, onClick, onContextMenu, small }: CardProps) {
   if (isHiddenCard(card.templateId)) {
     return (
       <div
@@ -25,11 +28,27 @@ export function Card({ card, selected, onClick, small }: CardProps) {
   }
 
   const template = getTemplate(card.templateId)
+  const usageHint = getCardUsageHint(template)
 
-  const typeClass = `card card--${template.type}${selected ? ' card--selected' : ''}${small ? ' card--small' : ''}`
+  const typeClass = [
+    'card',
+    `card--${template.type}`,
+    selected ? 'card--selected' : '',
+    previewing ? 'card--previewing' : '',
+    small ? 'card--small' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
-    <button type="button" className={typeClass} onClick={onClick} title={template.description}>
+    <button
+      type="button"
+      className={typeClass}
+      onClick={onClick}
+      onContextMenu={onContextMenu}
+      title={previewing ? undefined : template.description}
+      aria-expanded={previewing}
+    >
       <span className="card__type">{template.type}</span>
       <span className="card__name">{template.name}</span>
       {template.type === 'character' && template.abilities && (
@@ -43,6 +62,9 @@ export function Card({ card, selected, onClick, small }: CardProps) {
       )}
       {template.type === 'passive' && (
         <span className="card__detail">{template.buff}</span>
+      )}
+      {previewing && (
+        <span className="card__preview-hint">{usageHint}</span>
       )}
     </button>
   )

@@ -8,6 +8,10 @@ import {
   selectCharacterAbility,
   selectHandCard,
   startGame,
+  pickObjective,
+  ackObjectiveReveal,
+  tickObjectivesDeadline,
+  rematchGame,
   useChainLockedCounter,
   useMirrorCounter,
   usePassive,
@@ -33,6 +37,10 @@ export type ClientAction =
   | { type: 'EXPIRE_COUNTER' }
   | { type: 'POP_VFX'; vfxId: string }
   | { type: 'CLEAR_REFILL' }
+  | { type: 'PICK_OBJECTIVE'; objectiveId: string }
+  | { type: 'ACK_OBJECTIVE_REVEAL' }
+  | { type: 'TICK_OBJECTIVES' }
+  | { type: 'REMATCH' }
 
 function findHandCard(state: GameState, playerId: 1 | 2, instanceId: string) {
   const player = state.players[playerId === 1 ? 0 : 1]
@@ -87,6 +95,15 @@ export function applyGameAction(
       return popVfxEvent(state, action.vfxId)
     case 'CLEAR_REFILL':
       return { ...state, refillEffect: null }
+    case 'PICK_OBJECTIVE':
+      return pickObjective(state, playerId, action.objectiveId)
+    case 'ACK_OBJECTIVE_REVEAL':
+      return ackObjectiveReveal(state, playerId)
+    case 'TICK_OBJECTIVES':
+      return tickObjectivesDeadline(state)
+    case 'REMATCH':
+      if (playerId !== 1) return { ...state, message: 'Only the host can start a rematch.' }
+      return rematchGame(state)
     default:
       return state
   }

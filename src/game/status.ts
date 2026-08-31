@@ -148,12 +148,17 @@ export function healAllBoardCharacters(player: PlayerState, amount: number): Pla
   return { ...player, board }
 }
 
-export function applyHauntStatus(char: BoardCharacter, duration = 2, dotDamage = 10): BoardCharacter {
+export function applyHauntStatus(
+  char: BoardCharacter,
+  duration = 2,
+  dotDamage = 10,
+  appliedBy?: 1 | 2,
+): BoardCharacter {
   return {
     ...char,
     statuses: [
       ...char.statuses.filter((s) => s.type !== 'haunt'),
-      { type: 'haunt' as const, turnsRemaining: duration, damagePerTurn: dotDamage },
+      { type: 'haunt' as const, turnsRemaining: duration, damagePerTurn: dotDamage, appliedBy },
     ],
   }
 }
@@ -206,61 +211,73 @@ export function applyRowLaneDamage(
   player: PlayerState,
   row: number,
   damage: number,
-): { player: PlayerState; hits: { row: number; col: number; name: string }[]; hadKill: boolean } {
+): { player: PlayerState; hits: { row: number; col: number; name: string }[]; hadKill: boolean; killCount: number } {
   const hits: { row: number; col: number; name: string }[] = []
   let eliminated = [...player.eliminated]
   let hadKill = false
+  let killCount = 0
   const board = player.board.map((slot) => {
     if (slot.row !== row || !slot.character) return slot
     const name = getTemplate(slot.character.card.templateId).name
     const result = applyDamageToSlot(slot, damage, eliminated)
     eliminated = result.eliminated
-    if (result.killed) hadKill = true
+    if (result.killed) {
+      hadKill = true
+      killCount += 1
+    }
     hits.push({ row: slot.row, col: slot.col, name })
     return result.slot
   })
-  return { player: { ...player, board, eliminated }, hits, hadKill }
+  return { player: { ...player, board, eliminated }, hits, hadKill, killCount }
 }
 
 export function applyColLaneDamage(
   player: PlayerState,
   col: number,
   damage: number,
-): { player: PlayerState; hits: { row: number; col: number; name: string }[]; hadKill: boolean } {
+): { player: PlayerState; hits: { row: number; col: number; name: string }[]; hadKill: boolean; killCount: number } {
   const hits: { row: number; col: number; name: string }[] = []
   let eliminated = [...player.eliminated]
   let hadKill = false
+  let killCount = 0
   const board = player.board.map((slot) => {
     if (slot.col !== col || !slot.character) return slot
     const name = getTemplate(slot.character.card.templateId).name
     const result = applyDamageToSlot(slot, damage, eliminated)
     eliminated = result.eliminated
-    if (result.killed) hadKill = true
+    if (result.killed) {
+      hadKill = true
+      killCount += 1
+    }
     hits.push({ row: slot.row, col: slot.col, name })
     return result.slot
   })
-  return { player: { ...player, board, eliminated }, hits, hadKill }
+  return { player: { ...player, board, eliminated }, hits, hadKill, killCount }
 }
 
 export function applyAoEDamage(
   player: PlayerState,
   slots: { row: number; col: number }[],
   damage: number,
-): { player: PlayerState; hits: { row: number; col: number; name: string }[]; hadKill: boolean } {
+): { player: PlayerState; hits: { row: number; col: number; name: string }[]; hadKill: boolean; killCount: number } {
   const hits: { row: number; col: number; name: string }[] = []
   let eliminated = [...player.eliminated]
   let hadKill = false
+  let killCount = 0
   const slotSet = new Set(slots.map((s) => `${s.row}-${s.col}`))
   const board = player.board.map((slot) => {
     if (!slotSet.has(`${slot.row}-${slot.col}`) || !slot.character) return slot
     const name = getTemplate(slot.character.card.templateId).name
     const result = applyDamageToSlot(slot, damage, eliminated)
     eliminated = result.eliminated
-    if (result.killed) hadKill = true
+    if (result.killed) {
+      hadKill = true
+      killCount += 1
+    }
     hits.push({ row: slot.row, col: slot.col, name })
     return result.slot
   })
-  return { player: { ...player, board, eliminated }, hits, hadKill }
+  return { player: { ...player, board, eliminated }, hits, hadKill, killCount }
 }
 
 /** @deprecated use applyRowLaneDamage — lanes are horizontal rows */
@@ -301,9 +318,11 @@ export function tickStatusesAndDots(player: PlayerState): {
   player: PlayerState
   messages: string[]
   vfx: VfxEvent[]
+  dotDamageByPlayer: Partial<Record<1 | 2, number>>
 } {
   const messages: string[] = []
   const vfx: VfxEvent[] = []
+  const dotDamageByPlayer: Partial<Record<1 | 2, number>> = {}
   let eliminated = [...player.eliminated]
 
   const board = player.board.map((slot) => {
@@ -324,6 +343,9 @@ export function tickStatusesAndDots(player: PlayerState): {
             targets: [{ row: slot.row, col: slot.col, name }],
           }),
         )
+        if (status.appliedBy === 1 || status.appliedBy === 2) {
+          dotDamageByPlayer[status.appliedBy] = (dotDamageByPlayer[status.appliedBy] ?? 0) + dmg
+        }
         if (!result.slot.character) {
           return { ...slot, character: null }
         }
@@ -350,6 +372,7 @@ export function tickStatusesAndDots(player: PlayerState): {
     player: { ...player, board: obscuredBoard, eliminated },
     messages,
     vfx,
+    dotDamageByPlayer,
   }
 }
 

@@ -553,6 +553,58 @@ export function getTemplate(templateId: string): CardTemplate {
   return CARD_TEMPLATES[templateId]
 }
 
+export function getCardUsageHint(template: CardTemplate): string {
+  if (template.type === 'character') {
+    return 'Select, then click an empty slot on your board to place.'
+  }
+  if (template.type === 'passive') {
+    return 'Select, then press Use Passive.'
+  }
+  if (template.type === 'attack' && template.effect === 'caffeinated_buff') {
+    return 'Select, then press Use to activate.'
+  }
+  if (
+    template.type === 'special' &&
+    (template.effect === 'soul_revive' ||
+      template.effect === 'quantity_buff' ||
+      template.effect === 'pickpocket_steal')
+  ) {
+    return 'Select, then press Use.'
+  }
+  if (template.effect === 'spell_book_reactive' || template.effect === 'chain_locked_reactive') {
+    return 'Hold in hand — counters enemy attack or special cards automatically.'
+  }
+  if (template.effect === 'explosive_aoe') {
+    return 'Select, then click the enemy board for a 2×2 blast.'
+  }
+  if (template.effect === 'column_sweep') {
+    return 'Select, then click an enemy column.'
+  }
+  if (template.effect === 'obscure') {
+    return 'Select, then click an enemy slot.'
+  }
+  if (template.effect === 'tornado_move') {
+    return 'Select, then click an enemy to relocate them.'
+  }
+  if (
+    template.effect === 'cannon_damage' ||
+    template.effect === 'cobweb' ||
+    template.effect === 'cooldown_pause'
+  ) {
+    return 'Select, then click an enemy character.'
+  }
+  if (template.effect === 'lane_freeze_damage') {
+    return 'Select, then click an enemy row (lane).'
+  }
+  if (template.type === 'attack') {
+    return 'Select, then click an enemy character.'
+  }
+  if (template.type === 'special') {
+    return 'Select, then follow the on-screen targeting prompt.'
+  }
+  return template.description
+}
+
 export function getAbility(templateId: string, abilityId: string) {
   return getTemplate(templateId).abilities?.find((a) => a.id === abilityId)
 }
