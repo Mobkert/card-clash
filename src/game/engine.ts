@@ -56,26 +56,31 @@ import {
   tickStatusesAndDots,
   triggerBreadOnElimination,
 } from './status'
+import { getPlayer, updatePlayer, nextPlayerId, randomOpponentId, playerIds, opponentIds } from './players'
 import type {
   AbilityDef,
   CardInstance,
   CardTemplate,
   GameState,
   HandAttackState,
+  PlayerCount,
+  PlayerId,
   PlayerState,
   TargetMode,
   VfxEvent,
 } from './types'
 
-export function createInitialGame(): GameState {
-  const p1 = createPlayer(1)
-  const p2 = createPlayer(2)
-  const p1Drawn = drawToHand(p1)
-  const p2Drawn = drawToHand(p2)
+export function createInitialGame(playerCount: PlayerCount = 2): GameState {
+  const players: PlayerState[] = []
+  for (const id of playerIds(playerCount)) {
+    const drawn = drawToHand(createPlayer(id))
+    players.push(drawn.player)
+  }
 
   return {
     phase: 'setup',
-    players: [p1Drawn.player, p2Drawn.player],
+    playerCount,
+    players,
     activePlayer: 1,
     selectedCard: null,
     characterAttack: null,
@@ -92,23 +97,19 @@ export function createInitialGame(): GameState {
     vfxQueue: [],
     message: 'Setup mode — place cards on each board, then press Start Game.',
     objectiveDraftOptions: [],
-    objectivePicks: emptyObjectivePicks(),
+    objectivePicks: emptyObjectivePicks(playerCount),
     objectiveRandomPick: null,
-    objectivesAck: emptyObjectivesAck(),
+    objectivesAck: emptyObjectivesAck(playerCount),
     objectivesDeadlineMs: null,
     winner: null,
   }
 }
 
-function updatePlayer(players: [PlayerState, PlayerState], playerId: 1 | 2, updated: PlayerState) {
-  return playerId === 1 ? [updated, players[1]] as [PlayerState, PlayerState] : [players[0], updated] as [PlayerState, PlayerState]
-}
-
 /** Board updates use local `players`; objective stats live on tracked game state — merge before return. */
 function mergePlayerObjectiveProgress(
   gameState: GameState,
-  boardPlayers: [PlayerState, PlayerState],
-): [PlayerState, PlayerState] {
+  boardPlayers: PlayerState[],
+): PlayerState[] {
   return boardPlayers.map((p) => {
     const tracked = getPlayer(gameState.players, p.id)
     return {
@@ -116,11 +117,7 @@ function mergePlayerObjectiveProgress(
       objectiveStats: tracked.objectiveStats,
       objectives: tracked.objectives,
     }
-  }) as [PlayerState, PlayerState]
-}
-
-function getPlayer(players: [PlayerState, PlayerState], playerId: 1 | 2): PlayerState {
-  return playerId === 1 ? players[0] : players[1]
+  })
 }
 
 function findSlotIndex(player: PlayerState, row: number, col: number) {
@@ -131,7 +128,7 @@ function removeFromHand(player: PlayerState, card: CardInstance): PlayerState {
   return { ...player, hand: player.hand.filter((c) => c.instanceId !== card.instanceId) }
 }
 
-function canTakeTurnAction(state: GameState, playerId: 1 | 2): boolean {
+function canTakeTurnAction(state: GameState, playerId: PlayerId): boolean {
   if (state.phase === 'finished') return false
   if (state.phase === 'objectives' || state.phase === 'objective_reveal') return false
   if (state.phase !== 'playing') return true
@@ -139,11 +136,11 @@ function canTakeTurnAction(state: GameState, playerId: 1 | 2): boolean {
   return !state.turnActionUsed
 }
 
-function trackObjectiveKill(state: GameState, attackerId: 1 | 2): GameState {
+function trackObjectiveKill(state: GameState, attackerId: PlayerId): GameState {
   return applyObjectiveEvent(state, attackerId, 'eliminations', 1)
 }
 
-function trackObjectiveKills(state: GameState, attackerId: 1 | 2, count: number): GameState {
+function trackObjectiveKills(state: GameState, attackerId: PlayerId, count: number): GameState {
   let next = state
   for (let i = 0; i < count; i += 1) {
     next = trackObjectiveKill(next, attackerId)
@@ -151,12 +148,12 @@ function trackObjectiveKills(state: GameState, attackerId: 1 | 2, count: number)
   return next
 }
 
-function trackObjectiveDamage(state: GameState, playerId: 1 | 2, amount: number): GameState {
+function trackObjectiveDamage(state: GameState, playerId: PlayerId, amount: number): GameState {
   if (amount <= 0) return state
   return applyObjectiveEvent(state, playerId, 'damage_dealt', amount)
 }
 
-function startTurnProcessing(state: GameState, playerId: 1 | 2): GameState {
+function startTurnProcessing(state: GameState, playerId: PlayerId): GameState {
   if (state.skipNextTurnFor === playerId) {
     return finishTurnAction(
       {
@@ -179,7 +176,7 @@ function startTurnProcessing(state: GameState, playerId: 1 | 2): GameState {
   vfx.push(...ticked.vfx)
 
   let nextState: GameState = { ...state, players }
-  for (const creditedId of [1, 2] as const) {
+  for (const creditedId of playerIds(state.playerCount)) {
     const amount = ticked.dotDamageByPlayer[creditedId] ?? 0
     if (amount > 0) nextState = trackObjectiveDamage(nextState, creditedId, amount)
   }
@@ -207,7 +204,7 @@ function startTurnProcessing(state: GameState, playerId: 1 | 2): GameState {
   }
 }
 
-function finishTurnAction(state: GameState, actingPlayerId: 1 | 2): GameState {
+function finishTurnAction(state: GameState, actingPlayerId: PlayerId): GameState {
   const player = getPlayer(state.players, actingPlayerId)
   const { player: refilled, drawn, drawnCards } = drawToHand(player)
 
@@ -238,12 +235,12 @@ function finishTurnAction(state: GameState, actingPlayerId: 1 | 2): GameState {
     )
   }
 
-  const nextPlayer = actingPlayerId === 1 ? 2 : 1
+  const nextPlayer = nextPlayerId(actingPlayerId, state.playerCount)
 
   let newState: GameState = {
     ...state,
     players: updatePlayer(state.players, actingPlayerId, refilled),
-    activePlayer: nextPlayer as 1 | 2,
+    activePlayer: nextPlayer,
     selectedCard: null,
     characterAttack: null,
     handAttack: null,
@@ -265,7 +262,7 @@ function finishTurnAction(state: GameState, actingPlayerId: 1 | 2): GameState {
   return newState
 }
 
-function completeAction(state: GameState, playerId: 1 | 2, vfx: VfxEvent[] = []): GameState {
+function completeAction(state: GameState, playerId: PlayerId, vfx: VfxEvent[] = []): GameState {
   let s: GameState = {
     ...state,
     characterAttack: null,
@@ -290,7 +287,7 @@ export function popVfxEvent(state: GameState, id: string): GameState {
   return { ...state, vfxQueue: state.vfxQueue.filter((v) => v.id !== id) }
 }
 
-export function selectHandCard(state: GameState, card: CardInstance, controllingPlayer: 1 | 2): GameState {
+export function selectHandCard(state: GameState, card: CardInstance, controllingPlayer: PlayerId): GameState {
   if (state.handAttack) {
     return { ...state, message: 'Finish your Double Trouble second target first!' }
   }
@@ -336,8 +333,8 @@ export function selectHandCard(state: GameState, card: CardInstance, controlling
 
 export function clickDeck(
   state: GameState,
-  playerId: 1 | 2,
-  controllingPlayer: 1 | 2,
+  playerId: PlayerId,
+  controllingPlayer: PlayerId,
 ): GameState {
   if (state.handAttack) {
     return { ...state, message: 'Finish your Double Trouble second target first!' }
@@ -405,7 +402,7 @@ export function clickDeck(
 
 export function placeCharacterOnBoard(
   state: GameState,
-  playerId: 1 | 2,
+  playerId: PlayerId,
   row: number,
   col: number,
 ): GameState {
@@ -463,10 +460,10 @@ export function placeCharacterOnBoard(
 
 export function openCharacterAbilities(
   state: GameState,
-  playerId: 1 | 2,
+  playerId: PlayerId,
   row: number,
   col: number,
-  controllingPlayer: 1 | 2,
+  controllingPlayer: PlayerId,
 ): GameState {
   if (state.handAttack) {
     return { ...state, message: 'Finish your Double Trouble second target first!' }
@@ -550,8 +547,8 @@ const SINGLE_TARGET_ENEMY_EFFECTS = new Set<AbilityDef['effect']>([
 
 function rejectIfBlocked(
   state: GameState,
-  attackerId: 1 | 2,
-  defenderId: 1 | 2,
+  attackerId: PlayerId,
+  defenderId: PlayerId,
   targetRow: number,
   targetCol: number,
 ): GameState | null {
@@ -563,13 +560,13 @@ function rejectIfBlocked(
 }
 
 function maybeApplyThornMail(
-  players: [PlayerState, PlayerState],
-  defenderId: 1 | 2,
-  attackerId: 1 | 2,
+  players: PlayerState[],
+  defenderId: PlayerId,
+  attackerId: PlayerId,
   vfxList: VfxEvent[],
   attackerRow?: number,
   attackerCol?: number,
-): [PlayerState, PlayerState] {
+): PlayerState[] {
   if (attackerId === defenderId) return players
   return applyThornMailRetaliation(
     players,
@@ -583,10 +580,10 @@ function maybeApplyThornMail(
 }
 
 function applyGambleConsume(
-  players: [PlayerState, PlayerState],
-  playerId: 1 | 2,
+  players: PlayerState[],
+  playerId: PlayerId,
   vfxList: VfxEvent[],
-): [PlayerState, PlayerState] {
+): PlayerState[] {
   const player = getPlayer(players, playerId)
   const heads = hasBuff(player, 'gamble_heads')
   const tails = hasBuff(player, 'gamble_tails')
@@ -602,8 +599,8 @@ function applyGambleConsume(
 
 function appendGambleStrikeVfx(
   vfxList: VfxEvent[],
-  playerId: 1 | 2,
-  targetPlayerId: 1 | 2,
+  playerId: PlayerId,
+  targetPlayerId: PlayerId,
   targets: { row: number; col: number; name: string }[],
   gambleMult: number,
 ) {
@@ -631,11 +628,12 @@ function resolveLaneVfx(ability: AbilityDef): string {
 }
 
 function applyHauntRecoil(
-  players: [PlayerState, PlayerState],
-  attackerId: 1 | 2,
+  players: PlayerState[],
+  attackerId: PlayerId,
   attackerRow: number,
   attackerCol: number,
-): { players: [PlayerState, PlayerState]; vfx: VfxEvent[]; message: string | null; recoilCredit: { playerId: 1 | 2; amount: number } | null } {
+  playerCount: PlayerCount,
+): { players: PlayerState[]; vfx: VfxEvent[]; message: string | null; recoilCredit: { playerId: PlayerId; amount: number } | null } {
   const player = getPlayer(players, attackerId)
   const idx = findSlotIndex(player, attackerRow, attackerCol)
   const slot = player.board[idx]
@@ -644,10 +642,10 @@ function applyHauntRecoil(
   }
   const haunt = slot.character.statuses.find((s) => s.type === 'haunt')
   const dmg = haunt?.damagePerTurn ?? 10
-  const creditPlayerId =
-    haunt?.appliedBy === 1 || haunt?.appliedBy === 2
+  const creditPlayerId: PlayerId =
+    haunt?.appliedBy === 1 || haunt?.appliedBy === 2 || haunt?.appliedBy === 3
       ? haunt.appliedBy
-      : ((attackerId === 1 ? 2 : 1) as 1 | 2)
+      : randomOpponentId(attackerId, playerCount)
   const name = getTemplate(slot.character.card.templateId).name
   const result = applyDamageToSlot(slot, dmg, player.eliminated)
   const board = player.board.map((s, i) => (i === idx ? result.slot : s))
@@ -743,12 +741,12 @@ export function selectCharacterAbility(state: GameState, abilityId: string): Gam
 }
 
 function updateAttackerSlot(
-  players: [PlayerState, PlayerState],
-  playerId: 1 | 2,
+  players: PlayerState[],
+  playerId: PlayerId,
   row: number,
   col: number,
   updater: (char: NonNullable<BoardSlot['character']>) => NonNullable<BoardSlot['character']>,
-): [PlayerState, PlayerState] {
+): PlayerState[] {
   const player = getPlayer(players, playerId)
   const idx = findSlotIndex(player, row, col)
   if (idx === -1 || !player.board[idx].character) return players
@@ -762,11 +760,11 @@ type BoardSlot = PlayerState['board'][number]
 
 function applyAbilityCore(
   state: GameState,
-  attackerId: 1 | 2,
+  attackerId: PlayerId,
   attackerRow: number,
   attackerCol: number,
   ability: AbilityDef,
-  targetPlayerId: 1 | 2,
+  targetPlayerId: PlayerId,
   targetRow: number,
   targetCol: number,
   options?: { skipCooldown?: boolean; cooldownAbility?: AbilityDef },
@@ -784,13 +782,13 @@ function applyAbilityCore(
   const calcAbilityDmg = (base: number) =>
     calcOutgoingDamage(attacker, base, shardActive, attackerChar, gambleMult)
 
-  const applyHauntedToEnemy = (tPid: 1 | 2, tRow: number, tCol: number) => {
+  const applyHauntedToEnemy = (tPid: PlayerId, tRow: number, tCol: number) => {
     if (attackerId === tPid || !hasBuff(getPlayer(players, attackerId), 'haunted')) return
     players = applyHauntedToTarget(players, attackerId, tPid, tRow, tCol, vfxList)
     hauntedApplied = true
   }
 
-  const applyHauntedToHits = (tPid: 1 | 2, hits: { row: number; col: number }[]) => {
+  const applyHauntedToHits = (tPid: PlayerId, hits: { row: number; col: number }[]) => {
     if (attackerId === tPid || !hasBuff(getPlayer(players, attackerId), 'haunted')) return
     for (const hit of hits) {
       players = applyHauntedToTarget(players, attackerId, tPid, hit.row, hit.col, vfxList)
@@ -810,7 +808,7 @@ function applyAbilityCore(
     }
   }
 
-  const hauntRecoil = applyHauntRecoil(players, attackerId, attackerRow, attackerCol)
+  const hauntRecoil = applyHauntRecoil(players, attackerId, attackerRow, attackerCol, state.playerCount)
   players = hauntRecoil.players
   vfxList.push(...hauntRecoil.vfx)
   if (hauntRecoil.message) message = hauntRecoil.message
@@ -845,7 +843,7 @@ function applyAbilityCore(
     const updated = applyDamageToPlayerBoard(target, targetRow, targetCol, dmg)
     const hadKill = updated.killed != null
     players = updatePlayer(players, targetPlayerId, updated.player)
-    players = applyBreadIfNeeded(players, hadKill, vfxList)
+    players = applyBreadIfNeeded(players, hadKill, vfxList, state.playerCount)
     players = maybeApplyThornMail(players, targetPlayerId, attackerId, vfxList, attackerRow, attackerCol)
     trackDamage(dmg)
     if (hadKill) trackKill()
@@ -915,7 +913,7 @@ function applyAbilityCore(
     const target = getPlayer(players, targetPlayerId)
     const laneResult = applyRowLaneDamage(target, targetRow, dmg)
     players = updatePlayer(players, targetPlayerId, laneResult.player)
-    players = applyBreadIfNeeded(players, laneResult.hadKill, vfxList)
+    players = applyBreadIfNeeded(players, laneResult.hadKill, vfxList, state.playerCount)
     for (let i = 0; i < laneResult.hits.length; i++) {
       players = maybeApplyThornMail(players, targetPlayerId, attackerId, vfxList, attackerRow, attackerCol)
     }
@@ -1042,7 +1040,7 @@ function applyAbilityCore(
       return result.slot
     })
     players = updatePlayer(players, targetPlayerId, { ...target, board, eliminated })
-    players = applyBreadIfNeeded(players, hadKill, vfxList)
+    players = applyBreadIfNeeded(players, hadKill, vfxList, state.playerCount)
     trackDamage(dmg * hits.length)
     if (killCount > 0) trackKill(killCount)
     applyHauntedToHits(targetPlayerId, hits)
@@ -1244,11 +1242,11 @@ function applyAbilityCore(
 
 function applyAbilityEffect(
   state: GameState,
-  attackerId: 1 | 2,
+  attackerId: PlayerId,
   attackerRow: number,
   attackerCol: number,
   ability: AbilityDef,
-  targetPlayerId: 1 | 2,
+  targetPlayerId: PlayerId,
   targetRow: number,
   targetCol: number,
 ): GameState {
@@ -1268,11 +1266,11 @@ function applyAbilityEffect(
 
 function applyChaosAbilityEffect(
   state: GameState,
-  attackerId: 1 | 2,
+  attackerId: PlayerId,
   attackerRow: number,
   attackerCol: number,
   ability: AbilityDef,
-  targetPlayerId: 1 | 2,
+  targetPlayerId: PlayerId,
   clickRow: number,
 ): GameState {
   const aoeSlots = get2x2AoESlots(clickRow)
@@ -1425,7 +1423,7 @@ function applyChaosAbilityEffect(
     return { ...state, message: 'Chaos cannot amplify that ability.' }
   }
 
-  players = applyBreadIfNeeded(players, hadKill, vfxList)
+  players = applyBreadIfNeeded(players, hadKill, vfxList, state.playerCount)
   players = updatePlayer(players, attackerId, consumePendingBuff(getPlayer(players, attackerId), 'chaos'))
 
   if (shardActive && hits.length) {
@@ -1520,8 +1518,8 @@ function countOtherEnemySlots(
 
 function appendDoubleTroubleHitVfx(
   vfxList: VfxEvent[],
-  attackerId: 1 | 2,
-  targetPlayerId: 1 | 2,
+  attackerId: PlayerId,
+  targetPlayerId: PlayerId,
   targetRow: number,
   targetCol: number,
   targetName: string,
@@ -1537,11 +1535,11 @@ function appendDoubleTroubleHitVfx(
 
 function finalizeCharacterAbility(
   state: GameState,
-  playerId: 1 | 2,
+  playerId: PlayerId,
   row: number,
   col: number,
   ability: AbilityDef,
-  players: [PlayerState, PlayerState],
+  players: PlayerState[],
   vfx: VfxEvent[],
   message: string,
 ): GameState {
@@ -1556,9 +1554,9 @@ function finalizeCharacterAbility(
 
 function finalizeHandAttack(
   state: GameState,
-  playerId: 1 | 2,
+  playerId: PlayerId,
   card: CardInstance,
-  players: [PlayerState, PlayerState],
+  players: PlayerState[],
   vfx: VfxEvent[],
   message: string,
 ): GameState {
@@ -1569,10 +1567,10 @@ function finalizeHandAttack(
 
 export function useCharacterAbilityOnTarget(
   state: GameState,
-  targetPlayerId: 1 | 2,
+  targetPlayerId: PlayerId,
   targetRow: number,
   targetCol: number,
-  controllingPlayer: 1 | 2,
+  controllingPlayer: PlayerId,
 ): GameState {
   if (!state.characterAttack?.abilityId) return state
 
@@ -1917,23 +1915,24 @@ const HAUNT_PASSIVE_DURATION = 2
 const HAUNT_PASSIVE_DOT = 10
 
 function applyBreadIfNeeded(
-  players: [PlayerState, PlayerState],
+  players: PlayerState[],
   hadKill: boolean,
   vfxList: VfxEvent[],
-): [PlayerState, PlayerState] {
+  playerCount: PlayerCount,
+): PlayerState[] {
   if (!hadKill) return players
-  const bread = triggerBreadOnElimination(players, updatePlayer)
+  const bread = triggerBreadOnElimination(players, updatePlayer, playerCount)
   vfxList.push(...bread.vfx)
   return bread.players
 }
 
 function tryBlockElementalImmunity(
-  players: [PlayerState, PlayerState],
-  targetPlayerId: 1 | 2,
+  players: PlayerState[],
+  targetPlayerId: PlayerId,
   effect: CardTemplate['effect'] | undefined,
-  attackerId: 1 | 2,
+  attackerId: PlayerId,
   vfxList: VfxEvent[],
-): { players: [PlayerState, PlayerState]; blocked: boolean } {
+): { players: PlayerState[]; blocked: boolean } {
   if (!effect || !ELEMENTAL_IMMUNE_EFFECTS.has(effect)) {
     return { players, blocked: false }
   }
@@ -1956,13 +1955,13 @@ function getMoonlightBonus(player: PlayerState, effect: CardTemplate['effect'] |
 }
 
 function applyHauntedToTarget(
-  players: [PlayerState, PlayerState],
-  attackerId: 1 | 2,
-  targetPlayerId: 1 | 2,
+  players: PlayerState[],
+  attackerId: PlayerId,
+  targetPlayerId: PlayerId,
   targetRow: number,
   targetCol: number,
   vfxList: VfxEvent[],
-): [PlayerState, PlayerState] {
+): PlayerState[] {
   const attacker = getPlayer(players, attackerId)
   if (!hasBuff(attacker, 'haunted')) return players
 
@@ -2051,10 +2050,10 @@ function addCardLock(state: GameState, templateId: string, turns: number): GameS
 
 function tryOpenCounterPrompt(
   state: GameState,
-  attackerId: 1 | 2,
+  attackerId: PlayerId,
   playedCard: CardInstance,
   playedKind: 'attack' | 'special',
-  targetPlayerId: 1 | 2,
+  targetPlayerId: PlayerId,
   targetRow: number,
   targetCol: number,
 ): GameState | null {
@@ -2063,7 +2062,12 @@ function tryOpenCounterPrompt(
   const template = getTemplate(playedCard.templateId)
   if (template.effect && REACTIVE_EFFECTS.has(template.effect)) return null
 
-  const defenderId = playedKind === 'attack' ? targetPlayerId : (attackerId === 1 ? 2 : 1)
+  const defenderId =
+    playedKind === 'attack' || state.playerCount === 3
+      ? targetPlayerId
+      : attackerId === 1
+        ? 2
+        : 1
   const defender = getPlayer(state.players, defenderId)
   if (!hasCounterForPlayedKind(defender, playedKind)) return null
 
@@ -2085,11 +2089,11 @@ function tryOpenCounterPrompt(
 }
 
 function applyShardConsume(
-  players: [PlayerState, PlayerState],
-  playerId: 1 | 2,
+  players: PlayerState[],
+  playerId: PlayerId,
   hadShard: boolean,
   vfxList: VfxEvent[],
-): [PlayerState, PlayerState] {
+): PlayerState[] {
   if (!hadShard) return players
   const p = getPlayer(players, playerId)
   const updated = consumeShard(p)
@@ -2098,13 +2102,13 @@ function applyShardConsume(
 }
 
 function tryBlockAttackImmunity(
-  players: [PlayerState, PlayerState],
-  targetPlayerId: 1 | 2,
+  players: PlayerState[],
+  targetPlayerId: PlayerId,
   targetRow: number,
   targetCol: number,
-  attackerId: 1 | 2,
+  attackerId: PlayerId,
   vfxList: VfxEvent[],
-): { players: [PlayerState, PlayerState]; blocked: boolean; targetName: string } {
+): { players: PlayerState[]; blocked: boolean; targetName: string } {
   const target = getPlayer(players, targetPlayerId)
   const tIdx = findSlotIndex(target, targetRow, targetCol)
   const slot = target.board[tIdx]
@@ -2132,9 +2136,9 @@ function tryBlockAttackImmunity(
 
 function executeAttackCard(
   state: GameState,
-  playerId: 1 | 2,
+  playerId: PlayerId,
   card: CardInstance,
-  targetPlayerId: 1 | 2,
+  targetPlayerId: PlayerId,
   targetRow: number,
   targetCol: number,
   options?: { removeFromHand?: boolean; doubleTroubleActive?: boolean },
@@ -2211,7 +2215,7 @@ function executeAttackCard(
       }
     })
     players = updatePlayer(players, targetPlayerId, { ...damageResult.player, board })
-    players = applyBreadIfNeeded(players, damageResult.killed != null, vfxList)
+    players = applyBreadIfNeeded(players, damageResult.killed != null, vfxList, state.playerCount)
     players = maybeApplyThornMail(players, targetPlayerId, playerId, vfxList)
     if (hasBuff(getPlayer(players, playerId), 'haunted')) {
       players = applyHauntedToTarget(players, playerId, targetPlayerId, targetRow, targetCol, vfxList)
@@ -2349,7 +2353,7 @@ function executeAttackCard(
     const aoeSlots = get2x2AoESlots(targetRow)
     const { player: updated, hits, hadKill, killCount } = applyAoEDamage(target, aoeSlots, dmg)
     players = updatePlayer(players, targetPlayerId, updated)
-    players = applyBreadIfNeeded(players, hadKill, vfxList)
+    players = applyBreadIfNeeded(players, hadKill, vfxList, state.playerCount)
     const anchorRow = aoeSlots[0]?.row ?? targetRow
     message = `Explosive — ${hits.length} hit for ${dmg} each!`
     vfxList.push(
@@ -2384,7 +2388,7 @@ function executeAttackCard(
     const col = targetCol
     const { player: updated, hits, hadKill, killCount } = applyColLaneDamage(target, col, dmg)
     players = updatePlayer(players, targetPlayerId, updated)
-    players = applyBreadIfNeeded(players, hadKill, vfxList)
+    players = applyBreadIfNeeded(players, hadKill, vfxList, state.playerCount)
     message = `Sweep — ${hits.length} hit in column for ${dmg} each!`
     vfxList.push(
       createVfx('sweep', message, {
@@ -2499,7 +2503,7 @@ function cancelPendingPlay(state: GameState): GameState {
   return { ...state, counterPrompt: null, selectedCard: null }
 }
 
-export function useMirrorCounter(state: GameState, defenderId: 1 | 2): GameState {
+export function useMirrorCounter(state: GameState, defenderId: PlayerId): GameState {
   if (!state.counterPrompt || state.counterPrompt.defenderId !== defenderId) {
     return { ...state, message: 'No counter window active.' }
   }
@@ -2564,7 +2568,7 @@ export function useMirrorCounter(state: GameState, defenderId: 1 | 2): GameState
   return { ...resultState, message: 'Mirror only reflects attack cards.' }
 }
 
-export function useSpellBookCounter(state: GameState, defenderId: 1 | 2): GameState {
+export function useSpellBookCounter(state: GameState, defenderId: PlayerId): GameState {
   if (!state.counterPrompt || state.counterPrompt.defenderId !== defenderId) {
     return { ...state, message: 'No counter window active.' }
   }
@@ -2604,7 +2608,7 @@ export function useSpellBookCounter(state: GameState, defenderId: 1 | 2): GameSt
   return completeAction(appendVfx(newState, vfx), prompt.attackerId)
 }
 
-export function useChainLockedCounter(state: GameState, defenderId: 1 | 2): GameState {
+export function useChainLockedCounter(state: GameState, defenderId: PlayerId): GameState {
   if (!state.counterPrompt || state.counterPrompt.defenderId !== defenderId) {
     return { ...state, message: 'No counter window active.' }
   }
@@ -2638,7 +2642,7 @@ export function useChainLockedCounter(state: GameState, defenderId: 1 | 2): Game
   return completeAction(appendVfx(newState, vfx), prompt.attackerId)
 }
 
-function executeSpecialCard(state: GameState, playerId: 1 | 2, card: CardInstance): GameState {
+function executeSpecialCard(state: GameState, playerId: PlayerId, card: CardInstance): GameState {
   const template = getTemplate(card.templateId)
   const player = getPlayer(state.players, playerId)
   let players = state.players
@@ -2670,7 +2674,7 @@ function executeSpecialCard(state: GameState, playerId: 1 | 2, card: CardInstanc
     message = 'Quantity — 2 passives allowed for 5 turns!'
     vfxList.push(createVfx('quantity', message, { playerId }))
   } else if (template.effect === 'pickpocket_steal') {
-    const enemyId: 1 | 2 = playerId === 1 ? 2 : 1
+    const enemyId = randomOpponentId(playerId, state.playerCount)
     const stolenResult = stealRandomCardFromEnemy(playerId, enemyId, players)
     if (!stolenResult.stolen) {
       return { ...state, message: 'Enemy has no cards to steal!' }
@@ -2697,10 +2701,10 @@ function executeSpecialCard(state: GameState, playerId: 1 | 2, card: CardInstanc
 
 function tryHandAttackDoubleTroubleFirstHit(
   state: GameState,
-  playerId: 1 | 2,
+  playerId: PlayerId,
   card: CardInstance,
   template: CardTemplate,
-  targetPlayerId: 1 | 2,
+  targetPlayerId: PlayerId,
   targetRow: number,
   targetCol: number,
 ): GameState | null {
@@ -2755,10 +2759,10 @@ function tryHandAttackDoubleTroubleFirstHit(
 
 function useHandAttackOnTarget(
   state: GameState,
-  targetPlayerId: 1 | 2,
+  targetPlayerId: PlayerId,
   targetRow: number,
   targetCol: number,
-  controllingPlayer: 1 | 2,
+  controllingPlayer: PlayerId,
 ): GameState {
   const pending = state.handAttack
   if (!pending?.awaitingDoubleSecond) return state
@@ -2825,9 +2829,9 @@ function countTornadoDestinations(
 
 function beginTornadoMove(
   state: GameState,
-  playerId: 1 | 2,
+  playerId: PlayerId,
   card: CardInstance,
-  targetPlayerId: 1 | 2,
+  targetPlayerId: PlayerId,
   targetRow: number,
   targetCol: number,
 ): GameState {
@@ -2864,10 +2868,10 @@ function beginTornadoMove(
 
 function completeTornadoMove(
   state: GameState,
-  targetPlayerId: 1 | 2,
+  targetPlayerId: PlayerId,
   toRow: number,
   toCol: number,
-  controllingPlayer: 1 | 2,
+  controllingPlayer: PlayerId,
 ): GameState {
   const pending = state.tornadoMove
   if (!pending) return state
@@ -2934,10 +2938,10 @@ const TARGETED_SPECIAL_EFFECTS = new Set<CardTemplate['effect']>([
 ])
 
 function stealRandomCardFromEnemy(
-  thiefId: 1 | 2,
-  enemyId: 1 | 2,
-  players: [PlayerState, PlayerState],
-): { players: [PlayerState, PlayerState]; stolen: CardInstance | null } {
+  thiefId: PlayerId,
+  enemyId: PlayerId,
+  players: PlayerState[],
+): { players: PlayerState[]; stolen: CardInstance | null } {
   const enemy = getPlayer(players, enemyId)
   const pool = [...enemy.hand, ...enemy.deck]
   if (pool.length === 0) return { players, stolen: null }
@@ -2959,9 +2963,9 @@ function stealRandomCardFromEnemy(
 
 function executeTargetedSpecial(
   state: GameState,
-  playerId: 1 | 2,
+  playerId: PlayerId,
   card: CardInstance,
-  targetPlayerId: 1 | 2,
+  targetPlayerId: PlayerId,
   targetRow: number,
   targetCol: number,
 ): { state: GameState; vfx: VfxEvent[]; message: string } {
@@ -2991,7 +2995,7 @@ function executeTargetedSpecial(
     const targetName = getTemplate(target.board[tIdx].character!.card.templateId).name
     const damageResult = applyDamageToPlayerBoard(target, targetRow, targetCol, dmg)
     players = updatePlayer(players, targetPlayerId, damageResult.player)
-    players = applyBreadIfNeeded(players, damageResult.killed != null, vfxList)
+    players = applyBreadIfNeeded(players, damageResult.killed != null, vfxList, state.playerCount)
     players = maybeApplyThornMail(players, targetPlayerId, playerId, vfxList)
     players = updatePlayer(players, playerId, removeFromHand(getPlayer(players, playerId), card))
     message = `BOOM! Cannon dealt ${dmg} to ${targetName}!`
@@ -3095,7 +3099,7 @@ function executeTargetedSpecial(
       return { state: { ...state, message: 'That lane has no enemies!' }, vfx: [], message: 'That lane has no enemies!' }
     }
     players = updatePlayer(players, targetPlayerId, { ...target, board, eliminated })
-    players = applyBreadIfNeeded(players, hadKill, vfxList)
+    players = applyBreadIfNeeded(players, hadKill, vfxList, state.playerCount)
     for (let i = 0; i < hits.length; i++) {
       players = maybeApplyThornMail(players, targetPlayerId, playerId, vfxList)
     }
@@ -3163,9 +3167,9 @@ function executeTargetedSpecial(
 
 function resolveHandCard(
   state: GameState,
-  playerId: 1 | 2,
+  playerId: PlayerId,
   card: CardInstance,
-  targetPlayerId: 1 | 2,
+  targetPlayerId: PlayerId,
   targetRow: number,
   targetCol: number,
 ): GameState {
@@ -3280,7 +3284,7 @@ function resolveHandCard(
   )
 }
 
-export function usePassive(state: GameState, playerId: 1 | 2): GameState {
+export function usePassive(state: GameState, playerId: PlayerId): GameState {
   if (!state.selectedCard) return { ...state, message: 'Select a passive card first.' }
   if (state.phase === 'playing' && state.activePlayer !== playerId) {
     return { ...state, message: 'Wait for your turn.' }
@@ -3445,7 +3449,7 @@ export function chooseTrade(
 
 export function removeFromBoard(
   state: GameState,
-  playerId: 1 | 2,
+  playerId: PlayerId,
   row: number,
   col: number,
 ): GameState {
@@ -3474,18 +3478,11 @@ export function removeFromBoard(
 
 export function startGame(state: GameState): GameState {
   const draftOptions = rollDraftOptions(state)
-  const players = [
-    {
-      ...state.players[0],
-      objectives: [],
-      objectiveStats: emptyObjectiveStats(),
-    },
-    {
-      ...state.players[1],
-      objectives: [],
-      objectiveStats: emptyObjectiveStats(),
-    },
-  ] as [PlayerState, PlayerState]
+  const players = state.players.map((p) => ({
+    ...p,
+    objectives: [],
+    objectiveStats: emptyObjectiveStats(),
+  }))
 
   return {
     ...state,
@@ -3493,7 +3490,7 @@ export function startGame(state: GameState): GameState {
     players,
     winner: null,
     objectiveDraftOptions: draftOptions,
-    objectivePicks: emptyObjectivePicks(),
+    objectivePicks: emptyObjectivePicks(state.playerCount),
     objectivesDeadlineMs: Date.now() + OBJECTIVES_INTRO_MS,
     selectedCard: null,
     characterAttack: null,
@@ -3512,18 +3509,25 @@ export function startGame(state: GameState): GameState {
   }
 }
 
-export function rematchGame(_state: GameState): GameState {
-  return createInitialGame()
+export function rematchGame(state: GameState): GameState {
+  return createInitialGame(state.playerCount)
 }
 
-function beginObjectiveRevealPhase(state: GameState, resolvedPicks: { 1: string; 2: string; random: string }): GameState {
+function beginObjectiveRevealPhase(
+  state: GameState,
+  resolvedPicks: ReturnType<typeof resolveObjectiveDraftPicks>,
+): GameState {
+  const objectivePicks = { ...state.objectivePicks }
+  for (const id of playerIds(state.playerCount)) {
+    objectivePicks[id] = resolvedPicks[id]
+  }
   return {
     ...state,
     phase: 'objective_reveal',
-    objectivePicks: { 1: resolvedPicks[1], 2: resolvedPicks[2] },
+    objectivePicks,
     objectiveRandomPick: resolvedPicks.random,
     objectiveDraftOptions: [],
-    objectivesAck: emptyObjectivesAck(),
+    objectivesAck: emptyObjectivesAck(state.playerCount),
     objectivesDeadlineMs: Date.now() + OBJECTIVE_REVEAL_ANIM_MS + OBJECTIVES_INTRO_MS,
     selectedCard: null,
     characterAttack: null,
@@ -3539,18 +3543,11 @@ function beginObjectiveRevealPhase(state: GameState, resolvedPicks: { 1: string;
 function finalizeObjectiveDraft(state: GameState): GameState {
   const resolvedPicks = resolveObjectiveDraftPicks(state)
   const matchObjectives = cloneObjectivesForPlayer(buildMatchObjectives(state))
-  const players = [
-    {
-      ...state.players[0],
-      objectives: cloneObjectivesForPlayer(matchObjectives),
-      objectiveStats: emptyObjectiveStats(),
-    },
-    {
-      ...state.players[1],
-      objectives: cloneObjectivesForPlayer(matchObjectives),
-      objectiveStats: emptyObjectiveStats(),
-    },
-  ] as [PlayerState, PlayerState]
+  const players = state.players.map((p) => ({
+    ...p,
+    objectives: cloneObjectivesForPlayer(matchObjectives),
+    objectiveStats: emptyObjectiveStats(),
+  }))
 
   return beginObjectiveRevealPhase(
     { ...state, players },
@@ -3565,7 +3562,7 @@ function beginPlayingPhase(state: GameState): GameState {
     activePlayer: 1,
     winner: null,
     objectivesDeadlineMs: null,
-    objectivesAck: emptyObjectivesAck(),
+    objectivesAck: emptyObjectivesAck(state.playerCount),
     objectiveRandomPick: null,
     selectedCard: null,
     characterAttack: null,
@@ -3586,7 +3583,7 @@ function beginPlayingPhase(state: GameState): GameState {
   return s
 }
 
-export function pickObjective(state: GameState, playerId: 1 | 2, objectiveId: string): GameState {
+export function pickObjective(state: GameState, playerId: PlayerId, objectiveId: string): GameState {
   if (state.phase !== 'objectives') return state
   if (state.objectivePicks[playerId]) {
     return { ...state, message: 'You already picked an objective.' }
@@ -3594,9 +3591,8 @@ export function pickObjective(state: GameState, playerId: 1 | 2, objectiveId: st
   if (!state.objectiveDraftOptions.some((obj) => obj.id === objectiveId)) {
     return { ...state, message: 'Invalid objective.' }
   }
-  const opponentId: 1 | 2 = playerId === 1 ? 2 : 1
-  if (state.objectivePicks[opponentId] === objectiveId) {
-    return { ...state, message: 'Your opponent already chose that objective.' }
+  if (opponentIds(playerId, state.playerCount).some((oid) => state.objectivePicks[oid] === objectiveId)) {
+    return { ...state, message: 'Another player already chose that objective.' }
   }
 
   const objectivePicks = { ...state.objectivePicks, [playerId]: objectiveId }
@@ -3624,7 +3620,7 @@ export function tickObjectivesDeadline(state: GameState, now = Date.now()): Game
   return state
 }
 
-export function ackObjectiveReveal(state: GameState, playerId: 1 | 2): GameState {
+export function ackObjectiveReveal(state: GameState, playerId: PlayerId): GameState {
   if (state.phase !== 'objective_reveal') return state
 
   const objectivesAck = { ...state.objectivesAck, [playerId]: true }
@@ -3651,10 +3647,10 @@ export function tickObjectiveRevealDeadline(state: GameState, now = Date.now()):
 
 export function handleBoardClick(
   state: GameState,
-  playerId: 1 | 2,
+  playerId: PlayerId,
   row: number,
   col: number,
-  controllingPlayer: 1 | 2,
+  controllingPlayer: PlayerId,
 ): GameState {
   if (state.tornadoMove) {
     if (playerId === controllingPlayer) {
@@ -3764,7 +3760,7 @@ export function handleBoardClick(
   return state
 }
 
-export function useSpecialNoTarget(state: GameState, playerId: 1 | 2): GameState {
+export function useSpecialNoTarget(state: GameState, playerId: PlayerId): GameState {
   if (!state.selectedCard || !canTakeTurnAction(state, playerId)) {
     return { ...state, message: 'Cannot use that now.' }
   }

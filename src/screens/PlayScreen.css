@@ -195,6 +195,51 @@
   flex: 1;
 }
 
+.play__arena--triple {
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.play__arena-top {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.play__center--triple {
+  max-width: 240px;
+  min-width: 200px;
+  padding-top: 12px;
+  align-self: stretch;
+  justify-content: flex-start;
+}
+
+.play__arena-sides {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  gap: 32px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+
+.play__objectives-center {
+  align-self: center;
+}
+
+.play__players--triple {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 1100px) {
+  .play__players--triple {
+    grid-template-columns: 1fr;
+  }
+}
+
+
 .play__center {
   display: flex;
   flex-direction: column;

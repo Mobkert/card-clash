@@ -10,8 +10,10 @@ type Spotlight = {
   radius: number
 }
 
+import type { PlayerId } from '../game/types'
+
 interface VictoryCinematicProps {
-  winnerId: 1 | 2
+  winnerId: PlayerId
   boardRef: RefObject<HTMLDivElement | null>
   arenaWrapRef: RefObject<HTMLDivElement | null>
   onComplete: () => void

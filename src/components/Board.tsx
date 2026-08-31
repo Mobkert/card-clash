@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useState } from 'react'
-import type { BoardSlot, VfxEvent } from '../game/types'
+import type { BoardSlot, PlayerId, VfxEvent } from '../game/types'
 import { getTemplate } from '../game/cards'
 import { get2x2AoESlots, getPlusAoESlots, isTargetBlockedByCharacter } from '../game/status'
 import { BoardVfxLayer } from './vfx/BoardVfxLayer'
@@ -7,8 +7,9 @@ import './Board.css'
 
 interface BoardProps {
   slots: BoardSlot[]
-  playerId: 1 | 2
+  playerId: PlayerId
   label: string
+  layout?: 'vertical' | 'horizontal'
   targeting?: boolean
   laneTargeting?: boolean
   aoeTargeting?: boolean
@@ -16,7 +17,7 @@ interface BoardProps {
   columnTargeting?: boolean
   allyTargeting?: boolean
   treeTargeting?: boolean
-  lineOfSightAttackerId?: 1 | 2
+  lineOfSightAttackerId?: PlayerId
   boardVfx?: VfxEvent[]
   onBoardVfxDone?: (id: string) => void
   onSlotClick: (row: number, col: number) => void
@@ -27,6 +28,7 @@ export const Board = forwardRef<HTMLDivElement, BoardProps>(function Board(
   slots,
   playerId,
   label,
+  layout = 'vertical',
   targeting,
   laneTargeting,
   aoeTargeting,
@@ -41,8 +43,15 @@ export const Board = forwardRef<HTMLDivElement, BoardProps>(function Board(
   },
   ref,
 ) {
-  const rows = [0, 1, 2, 3]
-  const cols = [0, 1]
+  const isHorizontal = layout === 'horizontal'
+  const outerIndices = isHorizontal ? [0, 1] : [0, 1, 2, 3]
+  const innerIndices = isHorizontal ? [0, 1, 2, 3] : [0, 1]
+
+  const slotAt = (outer: number, inner: number) => {
+    const row = isHorizontal ? inner : outer
+    const col = isHorizontal ? outer : inner
+    return slots.find((s) => s.row === row && s.col === col)!
+  }
   const [hoveredRow, setHoveredRow] = useState<number | null>(null)
   const [hoveredAoe, setHoveredAoe] = useState<{ row: number; col: number } | null>(null)
   const [hoveredCol, setHoveredCol] = useState<number | null>(null)
@@ -88,7 +97,10 @@ export const Board = forwardRef<HTMLDivElement, BoardProps>(function Board(
   }, [columnTargeting])
 
   return (
-    <div ref={ref} className={`board board--p${playerId}${targeting ? ' board--targeting' : ''}`}>
+    <div
+      ref={ref}
+      className={`board board--p${playerId}${isHorizontal ? ' board--horizontal' : ''}${targeting ? ' board--targeting' : ''}`}
+    >
       <h3 className="board__label">{label}</h3>
       {laneTargeting && (
         <p className="board__lane-hint">Hover a row — entire lane glows</p>
@@ -106,19 +118,22 @@ export const Board = forwardRef<HTMLDivElement, BoardProps>(function Board(
         <p className="board__lane-hint">Hover to preview + blast — click to fire</p>
       )}
       <div className="board__grid">
-        {rows.map((row) => {
-          const rowAttackGlow = activeLaneRow === row
+        {outerIndices.map((outer) => {
+          const laneIndex = isHorizontal ? null : outer
+          const rowAttackGlow = laneIndex != null && activeLaneRow === laneIndex
 
           return (
             <div
-              key={row}
-              className={`board__row${hoveredRow === row && laneTargeting ? ' board__row--lane-hover' : ''}${rowAttackGlow ? ' board__row--lane-strike' : ''}`}
-              onMouseEnter={() => laneTargeting && setHoveredRow(row)}
-              onMouseLeave={() => laneTargeting && setHoveredRow(null)}
+              key={outer}
+              className={`board__row${laneIndex != null && hoveredRow === laneIndex && laneTargeting ? ' board__row--lane-hover' : ''}${rowAttackGlow ? ' board__row--lane-strike' : ''}${isHorizontal ? ' board__row--horizontal' : ''}`}
+              onMouseEnter={() => laneTargeting && laneIndex != null && setHoveredRow(laneIndex)}
+              onMouseLeave={() => laneTargeting && laneIndex != null && setHoveredRow(null)}
             >
               <div className="board__row-glow" aria-hidden />
-              {cols.map((col) => {
-                const slot = slots.find((s) => s.row === row && s.col === col)!
+              {innerIndices.map((inner) => {
+                const row = isHorizontal ? inner : outer
+                const col = isHorizontal ? outer : inner
+                const slot = slotAt(outer, inner)
                 const char = slot.character
                 const template = char ? getTemplate(char.card.templateId) : null
                 const hpPercent = char ? (char.currentHealth / char.maxHealth) * 100 : 0
@@ -131,6 +146,11 @@ export const Board = forwardRef<HTMLDivElement, BoardProps>(function Board(
                   isPlusCenter ||
                   ((explosiveTargeting || columnTargeting) && isAoeCenter(row, col))
                 const willBeHit = inAoePreview && !!char
+
+                const laneHover =
+                  laneTargeting &&
+                  ((isHorizontal && hoveredRow === row) ||
+                    (!isHorizontal && hoveredRow === row))
 
                 const blockedByLineOfSight =
                   targeting &&
@@ -150,7 +170,7 @@ export const Board = forwardRef<HTMLDivElement, BoardProps>(function Board(
                   <button
                     key={`${row}-${col}`}
                     type="button"
-                    className={`board__slot${char ? ' board__slot--filled' : ''}${obscured ? ' board__slot--obscured' : ''}${isTargetable ? ' board__slot--targetable' : ''}${blockedByLineOfSight ? ' board__slot--blocked' : ''}${inAoePreview ? ' board__slot--aoe-preview' : ''}${willBeHit ? ' board__slot--aoe-will-hit' : ''}${aoeCenter ? ' board__slot--aoe-center' : ''}`}
+                    className={`board__slot${char ? ' board__slot--filled' : ''}${obscured ? ' board__slot--obscured' : ''}${isTargetable ? ' board__slot--targetable' : ''}${blockedByLineOfSight ? ' board__slot--blocked' : ''}${inAoePreview ? ' board__slot--aoe-preview' : ''}${willBeHit ? ' board__slot--aoe-will-hit' : ''}${aoeCenter ? ' board__slot--aoe-center' : ''}${laneHover ? ' board__slot--lane-hover' : ''}`}
                     onMouseEnter={() => {
                       if (laneTargeting) setHoveredRow(row)
                       if (aoeTargeting || explosiveTargeting) setHoveredAoe({ row, col })
@@ -206,7 +226,7 @@ export const Board = forwardRef<HTMLDivElement, BoardProps>(function Board(
             )}
           </div>
         )}
-        <BoardVfxLayer events={boardVfx} onDone={onBoardVfxDone} />
+        <BoardVfxLayer events={boardVfx} layout={layout} onDone={onBoardVfxDone} />
       </div>
     </div>
   )

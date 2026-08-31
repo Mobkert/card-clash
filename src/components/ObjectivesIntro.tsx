@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { OBJECTIVES_INTRO_MS } from '../game/objectives'
-import type { PlayerObjective } from '../game/types'
+import { playerIds } from '../game/players'
+import type { PlayerCount, PlayerId, PlayerObjective } from '../game/types'
 import './ObjectivesIntro.css'
 
 interface ObjectivesIntroProps {
-  myPlayerId: 1 | 2
+  myPlayerId: PlayerId
+  playerCount: PlayerCount
   draftOptions: PlayerObjective[]
-  picks: { 1: string | null; 2: string | null }
+  picks: Record<PlayerId, string | null>
   deadlineMs: number | null
   isOnline: boolean
   onPick: (objectiveId: string) => void
@@ -14,12 +16,17 @@ interface ObjectivesIntroProps {
 
 export function ObjectivesIntro({
   myPlayerId,
+  playerCount,
   draftOptions,
   picks,
   deadlineMs,
   isOnline,
   onPick,
 }: ObjectivesIntroProps) {
+  const ids = playerIds(playerCount)
+  const matchObjectives = playerCount === 3 ? 4 : 3
+  const draftSize = playerCount === 3 ? 10 : 8
+
   const [secondsLeft, setSecondsLeft] = useState(() =>
     deadlineMs ? Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000)) : Math.ceil(OBJECTIVES_INTRO_MS / 1000),
   )
@@ -35,16 +42,12 @@ export function ObjectivesIntro({
   }, [deadlineMs])
 
   const myPick = picks[myPlayerId]
-  const oppId: 1 | 2 = myPlayerId === 1 ? 2 : 1
-  const oppPick = picks[oppId]
-  const takenIds = new Set([picks[1], picks[2]].filter(Boolean) as string[])
-  const localPickerId: 1 | 2 | null = isOnline
+  const takenIds = new Set(ids.map((id) => picks[id]).filter(Boolean) as string[])
+  const localPickerId: PlayerId | null = isOnline
     ? null
-    : !picks[1]
-      ? 1
-      : !picks[2]
-        ? 2
-        : null
+    : ids.find((id) => !picks[id]) ?? null
+  const waitingForId = ids.find((id) => !picks[id] && id !== myPlayerId)
+  const allPicked = ids.every((id) => picks[id])
 
   return (
     <div className="objectives-intro" role="dialog" aria-modal="true" aria-labelledby="objectives-intro-title">
@@ -53,15 +56,15 @@ export function ObjectivesIntro({
           Choose Your Objective
         </h2>
         <p className="objectives-intro__hint">
-          <strong>8 options</strong> — Player 1 picks first, then Player 2, then a{' '}
-          <strong>random third</strong> is added. First to complete all three wins! Auto-picks in{' '}
-          <strong>{secondsLeft}s</strong> if someone hasn&apos;t chosen.
+          <strong>{draftSize} options</strong> — players pick in order, then a{' '}
+          <strong>random {playerCount === 3 ? 'fourth' : 'third'}</strong> is added. First to complete
+          all {matchObjectives} wins! Auto-picks in <strong>{secondsLeft}s</strong> if someone
+          hasn&apos;t chosen.
         </p>
 
         <ul className="objectives-draft__grid">
           {draftOptions.map((obj) => {
-            const pickedBy =
-              picks[1] === obj.id ? (1 as const) : picks[2] === obj.id ? (2 as const) : null
+            const pickedBy = ids.find((id) => picks[id] === obj.id) ?? null
             const isMine = myPick === obj.id
             const isTaken = takenIds.has(obj.id)
             const isLocalTurn = isOnline || localPickerId === myPlayerId
@@ -87,16 +90,14 @@ export function ObjectivesIntro({
         </ul>
 
         <div className="objectives-intro__ready-row">
-          <span
-            className={`objectives-intro__player-ready${picks[1] ? ' objectives-intro__player-ready--done' : ''}`}
-          >
-            Player 1 {picks[1] ? '✓ Picked' : secondsLeft > 0 ? 'Choosing…' : 'Auto-picking…'}
-          </span>
-          <span
-            className={`objectives-intro__player-ready${picks[2] ? ' objectives-intro__player-ready--done' : ''}`}
-          >
-            Player 2 {picks[2] ? '✓ Picked' : secondsLeft > 0 ? 'Choosing…' : 'Auto-picking…'}
-          </span>
+          {ids.map((id) => (
+            <span
+              key={id}
+              className={`objectives-intro__player-ready${picks[id] ? ' objectives-intro__player-ready--done' : ''}`}
+            >
+              Player {id} {picks[id] ? '✓ Picked' : secondsLeft > 0 ? 'Choosing…' : 'Auto-picking…'}
+            </span>
+          ))}
         </div>
 
         {!myPick && (
@@ -105,13 +106,13 @@ export function ObjectivesIntro({
               ? 'Click an objective above to lock in your pick.'
               : localPickerId === myPlayerId
                 ? `Player ${myPlayerId} — choose your objective.`
-                : `Waiting for Player ${localPickerId ?? oppId}…`}
+                : `Waiting for Player ${localPickerId ?? waitingForId ?? ids[0]}…`}
           </p>
         )}
-        {myPick && !oppPick && (
-          <p className="objectives-intro__waiting">Waiting for Player {oppId} to pick…</p>
+        {myPick && waitingForId && (
+          <p className="objectives-intro__waiting">Waiting for Player {waitingForId} to pick…</p>
         )}
-        {myPick && oppPick && (
+        {myPick && allPicked && (
           <p className="objectives-intro__waiting">Revealing match objectives…</p>
         )}
       </div>

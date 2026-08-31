@@ -2,13 +2,13 @@ import Peer, { type DataConnection } from 'peerjs'
 import { applyGameAction, type ClientAction } from '../game/applyGameAction'
 import { createInitialGame } from '../game/engine'
 import { filterGameStateForPlayer } from '../game/stateFilter'
-import type { GameState } from '../game/types'
+import type { GameState, PlayerCount, PlayerId } from '../game/types'
 import { generateRoomCode, peerIdFromCode, type WireMessage } from './types'
 
 export type MultiplayerCallbacks = {
   onHosted: (code: string) => void
-  onJoined: (code: string) => void
-  onGuestJoined: () => void
+  onJoined: (code: string, assignedId: PlayerId) => void
+  onGuestJoined: (guestId: PlayerId, joined: number, needed: number) => void
   onState: (state: GameState) => void
   onWaiting: (message: string) => void
   onError: (message: string) => void
@@ -62,16 +62,19 @@ export function setActiveMultiplayerClient(client: MultiplayerClient | null) {
 
 export class MultiplayerClient {
   private peer: Peer | null = null
-  private conn: DataConnection | null = null
+  private guestConns = new Map<PlayerId, DataConnection>()
+  private joinConn: DataConnection | null = null
   private hostState: GameState | null = null
   private closing = false
   private connected = false
   private alive = true
-  readonly playerId: 1 | 2
+  playerId: PlayerId
+  readonly playerCount: PlayerCount
   private callbacks: MultiplayerCallbacks
 
-  constructor(playerId: 1 | 2, callbacks: MultiplayerCallbacks) {
+  constructor(playerId: PlayerId, playerCount: PlayerCount, callbacks: MultiplayerCallbacks) {
     this.playerId = playerId
+    this.playerCount = playerCount
     this.callbacks = callbacks
   }
 
@@ -105,9 +108,9 @@ export class MultiplayerClient {
 
       peer.on('open', () => {
         if (!this.alive || settled) return
-        this.hostState = createInitialGame()
+        this.hostState = createInitialGame(this.playerCount)
         this.callbacks.onHosted(code)
-        this.callbacks.onWaiting('Share the code — waiting for guest…')
+        this.callbacks.onWaiting('Share the code — waiting for guests…')
         this.pushState(1)
         settled = true
         resolve(code)
@@ -130,17 +133,7 @@ export class MultiplayerClient {
 
       peer.on('connection', (incoming) => {
         if (!this.alive) return
-        if (this.conn?.open) {
-          incoming.close()
-          return
-        }
-        this.bindConnection(incoming)
-        incoming.on('open', () => {
-          if (!this.alive) return
-          this.connected = true
-          this.callbacks.onGuestJoined()
-          this.sendStateToGuest()
-        })
+        this.acceptGuestConnection(incoming)
       })
     })
   }
@@ -173,21 +166,21 @@ export class MultiplayerClient {
       peer.on('open', () => {
         if (!this.alive) return
         const conn = peer.connect(peerIdFromCode(normalized), { reliable: true })
-        this.bindConnection(conn)
+        this.joinConn = conn
+        this.bindJoinConnection(conn, normalized, () => {
+          if (!settled) {
+            settled = true
+            resolve()
+          }
+        }, fail)
 
         const timeout = setTimeout(() => {
           fail({ type: 'peer-unavailable' })
         }, 15000)
 
         conn.on('open', () => {
-          if (!this.alive) return
           clearTimeout(timeout)
           this.connected = true
-          this.callbacks.onJoined(normalized)
-          if (!settled) {
-            settled = true
-            resolve()
-          }
         })
 
         conn.on('error', () => {
@@ -204,13 +197,13 @@ export class MultiplayerClient {
     if (this.playerId === 1) {
       if (!this.hostState) return
       this.hostState = applyGameAction(this.hostState, 1, action)
-      this.pushState(1)
-      this.sendStateToGuest()
+      this.broadcastState()
       return
     }
 
-    if (this.conn?.open) {
-      this.conn.send({ type: 'action', action, playerId: 2 } satisfies WireMessage)
+    const conn = this.joinConn
+    if (conn?.open) {
+      conn.send({ type: 'action', action, playerId: this.playerId } satisfies WireMessage)
     }
   }
 
@@ -218,18 +211,26 @@ export class MultiplayerClient {
     this.alive = false
     this.closing = true
     this.connected = false
+    for (const conn of this.guestConns.values()) {
+      try {
+        conn.close()
+      } catch {
+        /* ignore */
+      }
+    }
+    this.guestConns.clear()
     try {
-      this.conn?.close()
+      this.joinConn?.close()
     } catch {
       /* ignore */
     }
+    this.joinConn = null
     try {
       this.peer?.removeAllListeners()
       this.peer?.destroy()
     } catch {
       /* ignore */
     }
-    this.conn = null
     this.peer = null
     this.hostState = null
     if (activeClient === this) activeClient = null
@@ -239,20 +240,67 @@ export class MultiplayerClient {
     if (this.alive) this.callbacks.onError(message)
   }
 
-  private bindConnection(conn: DataConnection) {
-    this.conn = conn
+  private acceptGuestConnection(incoming: DataConnection) {
+    const maxGuests = this.playerCount === 3 ? 2 : 1
+    if (this.guestConns.size >= maxGuests) {
+      incoming.close()
+      return
+    }
 
+    const guestId: PlayerId = this.guestConns.has(2) ? 3 : 2
+    this.guestConns.set(guestId, incoming)
+    this.bindHostConnection(incoming, guestId)
+
+    incoming.on('open', () => {
+      if (!this.alive) return
+      incoming.send({
+        type: 'welcome',
+        playerId: guestId,
+        playerCount: this.playerCount,
+      } satisfies WireMessage)
+      this.sendStateToGuest(guestId)
+
+      const joined = this.guestConns.size
+      const needed = maxGuests - joined
+      this.callbacks.onGuestJoined(guestId, joined, needed)
+    })
+  }
+
+  private bindHostConnection(conn: DataConnection, guestId: PlayerId) {
     conn.on('data', (raw) => {
       if (!this.alive) return
       const msg = raw as WireMessage
-      if (msg.type === 'state' && this.playerId === 2) {
-        this.callbacks.onState(msg.state)
+      if (msg.type === 'action' && this.hostState && msg.playerId === guestId) {
+        this.hostState = applyGameAction(this.hostState, msg.playerId, msg.action)
+        this.broadcastState()
+      }
+    })
+
+    conn.on('close', () => {
+      this.guestConns.delete(guestId)
+      if (!this.closing && this.connected && this.alive) {
+        this.callbacks.onDisconnect()
+      }
+    })
+  }
+
+  private bindJoinConnection(
+    conn: DataConnection,
+    code: string,
+    resolve: () => void,
+    fail: (err: { type?: string; message?: string }) => void,
+  ) {
+    conn.on('data', (raw) => {
+      if (!this.alive) return
+      const msg = raw as WireMessage
+      if (msg.type === 'welcome') {
+        this.playerId = msg.playerId
+        this.callbacks.onJoined(code, msg.playerId)
+        resolve()
         return
       }
-      if (msg.type === 'action' && this.playerId === 1 && this.hostState) {
-        this.hostState = applyGameAction(this.hostState, msg.playerId, msg.action)
-        this.pushState(1)
-        this.sendStateToGuest()
+      if (msg.type === 'state') {
+        this.callbacks.onState(msg.state)
       }
     })
 
@@ -261,18 +309,30 @@ export class MultiplayerClient {
         this.callbacks.onDisconnect()
       }
     })
+
+    conn.on('error', () => fail({ type: 'peer-unavailable' }))
   }
 
-  private pushState(viewerId: 1 | 2) {
+  private pushState(viewerId: PlayerId) {
     if (!this.hostState) return
     this.callbacks.onState(filterGameStateForPlayer(this.hostState, viewerId))
   }
 
-  private sendStateToGuest() {
-    if (!this.hostState || !this.conn?.open) return
-    this.conn.send({
+  private sendStateToGuest(guestId: PlayerId) {
+    if (!this.hostState) return
+    const conn = this.guestConns.get(guestId)
+    if (!conn?.open) return
+    conn.send({
       type: 'state',
-      state: filterGameStateForPlayer(this.hostState, 2),
+      state: filterGameStateForPlayer(this.hostState, guestId),
     } satisfies WireMessage)
+  }
+
+  private broadcastState() {
+    if (!this.hostState) return
+    this.pushState(1)
+    for (const guestId of this.guestConns.keys()) {
+      this.sendStateToGuest(guestId)
+    }
   }
 }

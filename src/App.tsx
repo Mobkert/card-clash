@@ -2,9 +2,10 @@ import { useCallback, useRef, useState } from 'react'
 import { CartoonBackground } from './components/CartoonBackground'
 import { MenuScreen } from './screens/MenuScreen'
 import { MultiplayerMenuScreen } from './screens/MultiplayerMenuScreen'
+import { PlayerCountSelect } from './screens/PlayerCountSelect'
 import { PlayScreen } from './screens/PlayScreen'
 import type { ClientAction } from './game/applyGameAction'
-import type { GameState } from './game/types'
+import type { GameState, PlayerCount, PlayerId } from './game/types'
 import {
   MultiplayerClient,
   setActiveMultiplayerClient,
@@ -13,17 +14,18 @@ import {
 import { generatePlayTheme, MENU_THEME, type PlayTheme } from './theme/playTheme'
 import './App.css'
 
-type Screen = 'menu' | 'multiplayer' | 'play' | 'online-play'
+type Screen = 'menu' | 'local-count' | 'multiplayer-count' | 'multiplayer' | 'play' | 'online-play'
 
 function App() {
   const [screen, setScreen] = useState<Screen>('menu')
+  const [playerCount, setPlayerCount] = useState<PlayerCount>(2)
   const [playTheme, setPlayTheme] = useState<PlayTheme | null>(null)
   const [mpStatus, setMpStatus] = useState('')
   const [mpCode, setMpCode] = useState<string | null>(null)
   const [mpError, setMpError] = useState<string | null>(null)
   const [mpConnecting, setMpConnecting] = useState(false)
   const [onlineGame, setOnlineGame] = useState<GameState | null>(null)
-  const [myPlayerId, setMyPlayerId] = useState<1 | 2>(1)
+  const [myPlayerId, setMyPlayerId] = useState<PlayerId>(1)
   const mpClientRef = useRef<MultiplayerClient | null>(null)
   const mpBusyRef = useRef(false)
 
@@ -46,19 +48,29 @@ function App() {
     (): MultiplayerCallbacks => ({
       onHosted: (code) => {
         setMpCode(code)
-        setMpStatus('Waiting for guest to join…')
+        setMpStatus(
+          playerCount === 3
+            ? 'Waiting for guests to join (2 needed)…'
+            : 'Waiting for guest to join…',
+        )
       },
-      onJoined: (code) => {
+      onJoined: (code, assignedId) => {
         setMpCode(code)
+        setMyPlayerId(assignedId)
         setMpStatus('Connected!')
         enterOnlinePlay()
       },
-      onGuestJoined: () => {
-        setMpStatus('Guest connected — starting match!')
-        enterOnlinePlay()
+      onGuestJoined: (guestId, _joined, needed) => {
+        if (needed > 0) {
+          setMpStatus(`Player ${guestId} joined — waiting for ${needed} more…`)
+        } else {
+          setMpStatus('All players connected — starting match!')
+          enterOnlinePlay()
+        }
       },
       onState: (state) => {
         setOnlineGame(state)
+        setPlayerCount(state.playerCount)
       },
       onWaiting: (message) => setMpStatus(message),
       onError: (message) => {
@@ -66,17 +78,12 @@ function App() {
         setMpConnecting(false)
       },
       onDisconnect: () => {
-        setMpError('Your opponent disconnected.')
+        setMpError('A player disconnected.')
         setMpConnecting(false)
       },
     }),
-    [enterOnlinePlay],
+    [enterOnlinePlay, playerCount],
   )
-
-  const handlePlay = () => {
-    setPlayTheme(generatePlayTheme())
-    setScreen('play')
-  }
 
   const handleBack = () => {
     resetMultiplayer()
@@ -84,7 +91,23 @@ function App() {
     setPlayTheme(null)
   }
 
+  const handleLocalPlay = () => {
+    setScreen('local-count')
+  }
+
   const handleMultiplayerMenu = () => {
+    resetMultiplayer()
+    setScreen('multiplayer-count')
+  }
+
+  const startLocalGame = (count: PlayerCount) => {
+    setPlayerCount(count)
+    setPlayTheme(generatePlayTheme())
+    setScreen('play')
+  }
+
+  const openMultiplayerLobby = (count: PlayerCount) => {
+    setPlayerCount(count)
     resetMultiplayer()
     setScreen('multiplayer')
   }
@@ -97,7 +120,7 @@ function App() {
     setMpCode(null)
     setMyPlayerId(1)
 
-    const client = new MultiplayerClient(1, makeCallbacks())
+    const client = new MultiplayerClient(1, playerCount, makeCallbacks())
     setActiveMultiplayerClient(client)
     mpClientRef.current = client
 
@@ -117,9 +140,8 @@ function App() {
     setMpConnecting(true)
     setMpError(null)
     setMpCode(null)
-    setMyPlayerId(2)
 
-    const client = new MultiplayerClient(2, makeCallbacks())
+    const client = new MultiplayerClient(2, playerCount, makeCallbacks())
     setActiveMultiplayerClient(client)
     mpClientRef.current = client
 
@@ -144,10 +166,27 @@ function App() {
       <CartoonBackground key={activeTheme.id} theme={activeTheme} />
       <div className="app__content">
         {screen === 'menu' && (
-          <MenuScreen onPlay={handlePlay} onMultiplayer={handleMultiplayerMenu} />
+          <MenuScreen onPlay={handleLocalPlay} onMultiplayer={handleMultiplayerMenu} />
+        )}
+        {screen === 'local-count' && (
+          <PlayerCountSelect
+            title="Local Play"
+            subtitle="Choose how many players are at the table."
+            onBack={() => setScreen('menu')}
+            onSelect={startLocalGame}
+          />
+        )}
+        {screen === 'multiplayer-count' && (
+          <PlayerCountSelect
+            title="Multiplayer"
+            subtitle="Pick a match size, then host or join with a room code."
+            onBack={() => setScreen('menu')}
+            onSelect={openMultiplayerLobby}
+          />
         )}
         {screen === 'multiplayer' && (
           <MultiplayerMenuScreen
+            playerCount={playerCount}
             onBack={handleBack}
             onHost={() => void handleHost()}
             onJoin={(code) => void handleJoin(code)}
@@ -158,13 +197,20 @@ function App() {
           />
         )}
         {screen === 'play' && playTheme && (
-          <PlayScreen key={playTheme.id} theme={playTheme} onBack={handleBack} mode="local" />
+          <PlayScreen
+            key={`${playTheme.id}-${playerCount}`}
+            theme={playTheme}
+            playerCount={playerCount}
+            onBack={handleBack}
+            mode="local"
+          />
         )}
         {screen === 'online-play' && playTheme && (
           onlineGame ? (
             <PlayScreen
-              key={`${playTheme.id}-online`}
+              key={`${playTheme.id}-online-${playerCount}`}
               theme={playTheme}
+              playerCount={playerCount}
               onBack={handleBack}
               mode="online"
               myPlayerId={myPlayerId}

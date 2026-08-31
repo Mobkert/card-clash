@@ -17,6 +17,14 @@
   margin-left: 8px;
 }
 
+.objectives-panel--center {
+  margin: 0;
+  flex: 1 1 auto;
+  max-width: 240px;
+  width: 100%;
+  align-self: stretch;
+}
+
 .objectives-panel__title {
   margin: 0 0 10px;
   font-size: 0.95rem;
@@ -89,7 +97,7 @@
 }
 
 @media (max-width: 900px) {
-  .objectives-panel:not(.objectives-panel--compact) {
+  .objectives-panel:not(.objectives-panel--compact):not(.objectives-panel--center) {
     display: none;
   }
 }

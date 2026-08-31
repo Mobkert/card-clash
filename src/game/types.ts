@@ -1,5 +1,8 @@
 export type CardType = 'character' | 'attack' | 'passive' | 'special'
 
+export type PlayerId = 1 | 2 | 3
+export type PlayerCount = 2 | 3
+
 export type TargetType =
   | 'enemy_character'
   | 'enemy_lane'
@@ -106,7 +109,7 @@ export interface CharacterStatus {
   damagePerTurn?: number
   permanent?: boolean
   /** Player who applied this status — used for objective damage credit on DOT/recoil. */
-  appliedBy?: 1 | 2
+  appliedBy?: PlayerId
 }
 
 export interface BoardCharacter {
@@ -121,7 +124,7 @@ export interface BoardCharacter {
 
 export interface SlotObscure {
   turnsRemaining: number
-  placedBy: 1 | 2
+  placedBy: PlayerId
 }
 
 export interface BoardSlot {
@@ -165,7 +168,7 @@ export interface LockedCard {
 }
 
 export interface PlayerState {
-  id: 1 | 2
+  id: PlayerId
   deck: CardInstance[]
   hand: CardInstance[]
   board: BoardSlot[]
@@ -194,33 +197,33 @@ export type TargetMode =
   | 'double_hit_second'
 
 export interface TornadoMoveState {
-  playerId: 1 | 2
+  playerId: PlayerId
   card: CardInstance
-  targetPlayerId: 1 | 2
+  targetPlayerId: PlayerId
   fromRow: number
   fromCol: number
 }
 
 export interface HandAttackState {
-  playerId: 1 | 2
+  playerId: PlayerId
   card: CardInstance
   targetMode: 'enemy_character' | 'enemy_slot'
-  firstTarget: { playerId: 1 | 2; row: number; col: number }
+  firstTarget: { playerId: PlayerId; row: number; col: number }
   awaitingDoubleSecond: true
 }
 
 export interface CharacterAttackState {
-  playerId: 1 | 2
+  playerId: PlayerId
   row: number
   col: number
   abilityId: string | null
   targetMode: TargetMode
-  firstTarget?: { playerId: 1 | 2; row: number; col: number }
+  firstTarget?: { playerId: PlayerId; row: number; col: number }
   awaitingDoubleSecond?: boolean
 }
 
 export interface RefillEffect {
-  playerId: 1 | 2
+  playerId: PlayerId
   cardsDrawn: number
   drawnInstanceIds: string[]
 }
@@ -229,8 +232,8 @@ export interface VfxEvent {
   id: string
   vfx: string
   message: string
-  playerId?: 1 | 2
-  targetPlayerId?: 1 | 2
+  playerId?: PlayerId
+  targetPlayerId?: PlayerId
   lane?: number
   /** Horizontal row index for lane attacks */
   laneRow?: number
@@ -242,11 +245,11 @@ export interface VfxEvent {
 }
 
 export interface CounterPrompt {
-  defenderId: 1 | 2
-  attackerId: 1 | 2
+  defenderId: PlayerId
+  attackerId: PlayerId
   playedCard: CardInstance
   playedKind: 'attack' | 'special'
-  targetPlayerId: 1 | 2
+  targetPlayerId: PlayerId
   targetRow: number
   targetCol: number
   deadlineMs: number
@@ -273,34 +276,35 @@ export interface PlayerObjectiveStats {
 }
 
 export interface TradeChoicePrompt {
-  playerId: 1 | 2
+  playerId: PlayerId
   passiveCard: CardInstance
 }
 
 export interface GameState {
   phase: GamePhase
-  players: [PlayerState, PlayerState]
-  activePlayer: 1 | 2
+  playerCount: PlayerCount
+  players: PlayerState[]
+  activePlayer: PlayerId
   selectedCard: CardInstance | null
   characterAttack: CharacterAttackState | null
   handAttack: HandAttackState | null
   tornadoMove: TornadoMoveState | null
-  abilityModal: { playerId: 1 | 2; row: number; col: number } | null
+  abilityModal: { playerId: PlayerId; row: number; col: number } | null
   tradeChoice: TradeChoicePrompt | null
   counterPrompt: CounterPrompt | null
   lockedCards: LockedCard[]
-  skipNextTurnFor: 1 | 2 | null
-  bonusTurnFor: 1 | 2 | null
+  skipNextTurnFor: PlayerId | null
+  bonusTurnFor: PlayerId | null
   turnActionUsed: boolean
   refillEffect: RefillEffect | null
   vfxQueue: VfxEvent[]
   message: string
   objectiveDraftOptions: PlayerObjective[]
-  objectivePicks: { 1: string | null; 2: string | null }
+  objectivePicks: Record<PlayerId, string | null>
   objectiveRandomPick: string | null
-  objectivesAck: { 1: boolean; 2: boolean }
+  objectivesAck: Record<PlayerId, boolean>
   objectivesDeadlineMs: number | null
-  winner: 1 | 2 | null
+  winner: PlayerId | null
 }
 
 export const BOARD_ROWS = 4

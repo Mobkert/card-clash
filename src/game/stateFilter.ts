@@ -1,5 +1,5 @@
 import { emptyObjectiveStats } from './objectives'
-import type { CardInstance, GameState, PlayerState } from './types'
+import type { CardInstance, GameState, PlayerId, PlayerState } from './types'
 
 const HIDDEN_TEMPLATE = '__hidden__'
 
@@ -7,7 +7,7 @@ function hideCard(_card: CardInstance, index: number, prefix: string): CardInsta
   return { instanceId: `${prefix}_${index}`, templateId: HIDDEN_TEMPLATE }
 }
 
-function hidePlayerSecrets(player: PlayerState, viewerId: 1 | 2): PlayerState {
+function hidePlayerSecrets(player: PlayerState, viewerId: PlayerId): PlayerState {
   const isSelf = player.id === viewerId
   return {
     ...player,
@@ -19,14 +19,14 @@ function hidePlayerSecrets(player: PlayerState, viewerId: 1 | 2): PlayerState {
   }
 }
 
-function selectedCardOwner(state: GameState, card: CardInstance): 1 | 2 | null {
-  const [p1, p2] = state.players
-  if (p1.hand.some((c) => c.instanceId === card.instanceId)) return 1
-  if (p2.hand.some((c) => c.instanceId === card.instanceId)) return 2
+function selectedCardOwner(state: GameState, card: CardInstance): PlayerId | null {
+  for (const player of state.players) {
+    if (player.hand.some((c) => c.instanceId === card.instanceId)) return player.id
+  }
   return null
 }
 
-function sanitizeMessage(state: GameState, viewerId: 1 | 2): string {
+function sanitizeMessage(state: GameState, viewerId: PlayerId): string {
   if (state.abilityModal && state.abilityModal.playerId !== viewerId) {
     return `Player ${state.abilityModal.playerId} is choosing…`
   }
@@ -58,12 +58,10 @@ function sanitizeMessage(state: GameState, viewerId: 1 | 2): string {
 }
 
 /** Strip opponent hand/deck contents for online clients. */
-export function filterGameStateForPlayer(state: GameState, viewerId: 1 | 2): GameState {
-  const [p1, p2] = state.players
-  const players: [PlayerState, PlayerState] =
-    viewerId === 1
-      ? [p1, hidePlayerSecrets(p2, viewerId)]
-      : [hidePlayerSecrets(p1, viewerId), p2]
+export function filterGameStateForPlayer(state: GameState, viewerId: PlayerId): GameState {
+  const players = state.players.map((p) =>
+    p.id === viewerId ? p : hidePlayerSecrets(p, viewerId),
+  )
 
   let selectedCard = state.selectedCard
   if (selectedCard) {

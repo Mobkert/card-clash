@@ -19,6 +19,45 @@
   color: #ef5350;
 }
 
+.board--p3 .board__label {
+  color: #ffb74d;
+}
+
+.board--horizontal .board__grid {
+  gap: 8px;
+}
+
+.board--horizontal .board__row--horizontal {
+  grid-template-columns: repeat(4, 100px);
+}
+
+.board--horizontal .board__slot--lane-hover {
+  border-color: rgba(179, 136, 255, 0.6);
+  background: rgba(179, 136, 255, 0.1);
+}
+
+.board--p3 .board__hp-fill {
+  background: linear-gradient(90deg, #ffb74d, #ffcc80);
+}
+
+.board--horizontal .board__aoe-cell--0-0 { top: 12px; left: 6px; }
+.board--horizontal .board__aoe-cell--0-1 { top: 104px; left: 6px; }
+.board--horizontal .board__aoe-cell--1-0 { top: 12px; left: 114px; }
+.board--horizontal .board__aoe-cell--1-1 { top: 104px; left: 114px; }
+.board--horizontal .board__aoe-cell--2-0 { top: 12px; left: 222px; }
+.board--horizontal .board__aoe-cell--2-1 { top: 104px; left: 222px; }
+.board--horizontal .board__aoe-cell--3-0 { top: 12px; left: 330px; }
+.board--horizontal .board__aoe-cell--3-1 { top: 104px; left: 330px; }
+
+.board--horizontal .board__aoe-cross--0-0 { top: 48px; left: 56px; }
+.board--horizontal .board__aoe-cross--0-1 { top: 140px; left: 56px; }
+.board--horizontal .board__aoe-cross--1-0 { top: 48px; left: 164px; }
+.board--horizontal .board__aoe-cross--1-1 { top: 140px; left: 164px; }
+.board--horizontal .board__aoe-cross--2-0 { top: 48px; left: 272px; }
+.board--horizontal .board__aoe-cross--2-1 { top: 140px; left: 272px; }
+.board--horizontal .board__aoe-cross--3-0 { top: 48px; left: 380px; }
+.board--horizontal .board__aoe-cross--3-1 { top: 140px; left: 380px; }
+
 .board__grid {
   position: relative;
   display: flex;

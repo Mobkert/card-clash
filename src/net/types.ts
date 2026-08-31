@@ -1,9 +1,10 @@
 import type { ClientAction } from '../game/applyGameAction'
-import type { GameState } from '../game/types'
+import type { GameState, PlayerCount, PlayerId } from '../game/types'
 
 export type WireMessage =
   | { type: 'state'; state: GameState }
-  | { type: 'action'; action: ClientAction; playerId: 1 | 2 }
+  | { type: 'action'; action: ClientAction; playerId: PlayerId }
+  | { type: 'welcome'; playerId: PlayerId; playerCount: PlayerCount }
 
 const PEER_PREFIX = 'cardclash-'
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'

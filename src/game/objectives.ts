@@ -1,4 +1,11 @@
-import type { GameState, PlayerObjective, PlayerState } from './types'
+import type { GameState, PlayerCount, PlayerId, PlayerObjective, PlayerState } from './types'
+import {
+  allPlayersPickedObjectives,
+  allPlayersSatisfied,
+  matchObjectiveCount,
+  objectiveDifficultyScale,
+  playerIds,
+} from './players'
 
 export type ObjectiveTrack =
   | 'eliminations'
@@ -29,14 +36,18 @@ export const OBJECTIVE_POOL: ObjectiveDef[] = [
 
 export const OBJECTIVES_INTRO_MS = 20_000
 export const OBJECTIVE_REVEAL_ANIM_MS = 4_500
-export const OBJECTIVE_DRAFT_COUNT = 8
-export const MATCH_OBJECTIVE_COUNT = 3
 
-export function createObjectiveFromDef(def: ObjectiveDef): PlayerObjective {
+export function objectiveDraftCount(playerCount: PlayerCount): number {
+  return playerCount === 3 ? 10 : 8
+}
+
+export function createObjectiveFromDef(def: ObjectiveDef, playerCount: PlayerCount = 2): PlayerObjective {
+  const scale = objectiveDifficultyScale(playerCount)
+  const target = Math.ceil(def.target * scale)
   return {
     id: def.id,
     label: def.label,
-    target: def.target,
+    target,
     progress: 0,
     completed: false,
   }
@@ -60,8 +71,8 @@ export function emptyObjectiveStats(): PlayerState['objectiveStats'] {
 function syncObjectiveProgress(objectives: PlayerObjective[], stats: PlayerState['objectiveStats']): PlayerObjective[] {
   return objectives.map((obj) => {
     const def = OBJECTIVE_POOL.find((d) => d.id === obj.id)
-    if (!def) return obj
-    const progress = stats[def.track]
+    const track = def?.track
+    const progress = track ? stats[track] : 0
     const completed = progress >= obj.target
     return { ...obj, progress: Math.min(progress, obj.target), completed }
   })
@@ -80,16 +91,18 @@ export function allObjectivesCompleted(objectives: PlayerObjective[]): boolean {
 
 export function applyObjectiveEvent(
   state: GameState,
-  playerId: 1 | 2,
+  playerId: PlayerId,
   track: ObjectiveTrack,
   amount = 1,
 ): GameState {
   if (state.phase !== 'playing' || state.winner != null) return state
 
-  const player = state.players[playerId === 1 ? 0 : 1]
+  const player = state.players.find((p) => p.id === playerId)
+  if (!player) return state
+
   const stats = { ...player.objectiveStats, [track]: player.objectiveStats[track] + amount }
   const updated = syncPlayerObjectives({ ...player, objectiveStats: stats })
-  const players = state.players.map((p) => (p.id === playerId ? updated : p)) as [PlayerState, PlayerState]
+  const players = state.players.map((p) => (p.id === playerId ? updated : p))
 
   let next: GameState = { ...state, players }
 
@@ -106,7 +119,7 @@ export function applyObjectiveEvent(
 }
 
 export function bothPlayersPicked(state: GameState): boolean {
-  return state.objectivePicks[1] != null && state.objectivePicks[2] != null
+  return allPlayersPickedObjectives(state.playerCount, state.objectivePicks)
 }
 
 export function objectivesIntroExpired(state: GameState, now = Date.now()): boolean {
@@ -123,63 +136,58 @@ function autoPickObjectiveId(options: PlayerObjective[], excluded: Set<string>):
   return available[Math.floor(Math.random() * available.length)]!.id
 }
 
-function resolvePicksWithAuto(state: GameState): { 1: string; 2: string; random: string } {
+function resolvePicksWithAuto(state: GameState): Record<PlayerId, string> & { random: string } {
   const options = state.objectiveDraftOptions
   const excluded = new Set<string>()
-  let pick1 = state.objectivePicks[1]
-  let pick2 = state.objectivePicks[2]
+  const picks: Record<PlayerId, string> = { 1: '', 2: '', 3: '' }
 
-  if (!pick1) {
-    pick1 = autoPickObjectiveId(options, excluded)
+  for (const id of playerIds(state.playerCount)) {
+    let pick = state.objectivePicks[id]
+    if (!pick || excluded.has(pick)) {
+      pick = autoPickObjectiveId(options, excluded) ?? options[0]?.id ?? 'eliminate_3'
+    }
+    picks[id] = pick
+    excluded.add(pick)
   }
-  if (!pick1) {
-    pick1 = options[0]?.id ?? 'eliminate_3'
-  }
-  excluded.add(pick1)
-
-  if (!pick2 || pick2 === pick1) {
-    pick2 = autoPickObjectiveId(options, excluded)
-  }
-  if (!pick2) {
-    pick2 = options.find((obj) => obj.id !== pick1)?.id ?? pick1
-  }
-  excluded.add(pick2)
 
   const random =
     autoPickObjectiveId(options, excluded) ??
     options.find((obj) => !excluded.has(obj.id))?.id ??
-    pick1
+    picks[1]
 
-  return { 1: pick1, 2: pick2, random }
+  return { ...picks, random }
 }
 
-export function resolveObjectiveDraftPicks(state: GameState): { 1: string; 2: string; random: string } {
+export function resolveObjectiveDraftPicks(state: GameState): Record<PlayerId, string> & { random: string } {
   return resolvePicksWithAuto(state)
 }
 
 export function buildMatchObjectives(state: GameState): PlayerObjective[] {
   const resolved = resolvePicksWithAuto(state)
-  return [resolved[1], resolved[2], resolved.random].map((id) => {
+  const ids = [...playerIds(state.playerCount).map((id) => resolved[id]), resolved.random]
+  return ids.map((id) => {
     const def = OBJECTIVE_POOL.find((d) => d.id === id)
     const draft = state.objectiveDraftOptions.find((o) => o.id === id)
-    if (def) return createObjectiveFromDef(def)
+    if (def) return createObjectiveFromDef(def, state.playerCount)
     if (draft) return { ...draft, progress: 0, completed: false }
     return { id, label: id, target: 1, progress: 0, completed: false }
   })
 }
 
-export function emptyObjectivePicks(): GameState['objectivePicks'] {
-  return { 1: null, 2: null }
+export function emptyObjectivePicks(count: PlayerCount): GameState['objectivePicks'] {
+  return { 1: null, 2: null, 3: count === 3 ? null : null }
 }
 
-export function emptyObjectivesAck(): GameState['objectivesAck'] {
-  return { 1: false, 2: false }
+export function emptyObjectivesAck(count: PlayerCount): GameState['objectivesAck'] {
+  return { 1: false, 2: false, 3: count === 3 ? false : false }
 }
 
 export function bothPlayersAckedReveal(state: GameState): boolean {
-  return state.objectivesAck[1] && state.objectivesAck[2]
+  return allPlayersSatisfied(state.playerCount, state.objectivesAck)
 }
 
 export function canProceedFromObjectiveReveal(state: GameState, now = Date.now()): boolean {
   return bothPlayersAckedReveal(state) || objectivesIntroExpired(state, now)
 }
+
+export { matchObjectiveCount }

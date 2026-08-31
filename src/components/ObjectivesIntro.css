@@ -179,6 +179,11 @@
   background: rgba(255, 138, 128, 0.1);
 }
 
+.objectives-draft__option--p3 {
+  border-color: rgba(255, 183, 77, 0.55);
+  background: rgba(255, 183, 77, 0.1);
+}
+
 .objectives-draft__option--mine {
   box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.35);
 }

@@ -3,12 +3,19 @@ import './ObjectivesPanel.css'
 
 interface ObjectivesPanelProps {
   objectives: PlayerObjective[]
-  side: 'left' | 'right'
+  side: 'left' | 'right' | 'center'
   compact?: boolean
   showRaceHint?: boolean
+  objectiveCount?: number
 }
 
-export function ObjectivesPanel({ objectives, side, compact = false, showRaceHint = false }: ObjectivesPanelProps) {
+export function ObjectivesPanel({
+  objectives,
+  side,
+  compact = false,
+  showRaceHint = false,
+  objectiveCount = 3,
+}: ObjectivesPanelProps) {
   if (objectives.length === 0) return null
 
   return (
@@ -18,7 +25,9 @@ export function ObjectivesPanel({ objectives, side, compact = false, showRaceHin
     >
       <h3 className="objectives-panel__title">Objectives</h3>
       {showRaceHint && (
-        <p className="objectives-panel__race-hint">First to complete all three wins the match.</p>
+        <p className="objectives-panel__race-hint">
+          First to complete all {objectiveCount} wins the match.
+        </p>
       )}
       <ul className="objectives-panel__list">
         {objectives.map((obj) => {

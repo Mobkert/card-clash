@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { getTemplate } from '../game/cards'
 import { clearRefillEffect, createInitialGame, rematchGame } from '../game/engine'
 import type { ClientAction } from '../game/applyGameAction'
 import { applyGameAction } from '../game/applyGameAction'
-import type { GameState } from '../game/types'
+import type { GameState, PlayerCount, PlayerId } from '../game/types'
+import { getPlayer, playerIds } from '../game/players'
 import { AbilityModal } from '../components/AbilityModal'
 import { Board } from '../components/Board'
 import { Deck } from '../components/Deck'
@@ -25,15 +26,29 @@ import './PlayScreen.css'
 
 interface PlayScreenProps {
   theme: PlayTheme
+  playerCount?: PlayerCount
   onBack: () => void
   mode?: 'local' | 'online'
-  myPlayerId?: 1 | 2
+  myPlayerId?: PlayerId
   onlineGame?: GameState
   onOnlineAction?: (action: ClientAction) => void
 }
 
+function refillKey(playerId: PlayerId): 'p1' | 'p2' | 'p3' {
+  if (playerId === 1) return 'p1'
+  if (playerId === 2) return 'p2'
+  return 'p3'
+}
+
+function onlineRoleLabel(playerId: PlayerId): string {
+  if (playerId === 1) return 'Host · Player 1'
+  if (playerId === 2) return 'Guest · Player 2'
+  return 'Guest · Player 3'
+}
+
 export function PlayScreen({
   theme,
+  playerCount: playerCountProp = 2,
   onBack,
   mode = 'local',
   myPlayerId = 1,
@@ -41,26 +56,38 @@ export function PlayScreen({
   onOnlineAction,
 }: PlayScreenProps) {
   const isOnline = mode === 'online'
-  const [localGame, setLocalGame] = useState<GameState>(createInitialGame)
+  const [localGame, setLocalGame] = useState<GameState>(() => createInitialGame(playerCountProp))
   const game = isOnline && onlineGame ? onlineGame : localGame
-  const [controllingPlayer, setControllingPlayer] = useState<1 | 2>(1)
+  const playerCount = game.playerCount
+  const isTriple = playerCount === 3
+  const ids = playerIds(playerCount)
+  const [controllingPlayer, setControllingPlayer] = useState<PlayerId>(1)
   const actorId = isOnline ? myPlayerId : controllingPlayer
-  const [newlyDrawnIds, setNewlyDrawnIds] = useState<{ p1: string[]; p2: string[] }>({
+  const [newlyDrawnIds, setNewlyDrawnIds] = useState<{ p1: string[]; p2: string[]; p3: string[] }>({
     p1: [],
     p2: [],
+    p3: [],
   })
   const [handPreviewId, setHandPreviewId] = useState<string | null>(null)
   const [showVictoryMenu, setShowVictoryMenu] = useState(false)
   const p1BoardRef = useRef<HTMLDivElement>(null)
   const p2BoardRef = useRef<HTMLDivElement>(null)
+  const p3BoardRef = useRef<HTMLDivElement>(null)
   const arenaWrapRef = useRef<HTMLDivElement>(null)
 
   const gameFinished = game.phase === 'finished' && game.winner != null
   const victoryCinematicActive = gameFinished && !showVictoryMenu
 
-  const [p1, p2] = game.players
+  const p1 = getPlayer(game.players, 1)
+  const p2 = getPlayer(game.players, 2)
+  const p3 = isTriple ? getPlayer(game.players, 3) : null
+  const boardRefs: Record<PlayerId, RefObject<HTMLDivElement | null>> = {
+    1: p1BoardRef,
+    2: p2BoardRef,
+    3: p3BoardRef,
+  }
 
-  const controlsPlayer = (pid: 1 | 2) =>
+  const controlsPlayer = (pid: PlayerId) =>
     isOnline ? myPlayerId === pid : controllingPlayer === pid
   const attackerId = isOnline ? actorId : controllingPlayer
 
@@ -79,7 +106,7 @@ export function PlayScreen({
     if (!game.refillEffect) return
 
     const { playerId, drawnInstanceIds } = game.refillEffect
-    const key = playerId === 1 ? 'p1' : 'p2'
+    const key = refillKey(playerId)
     setNewlyDrawnIds((prev) => ({ ...prev, [key]: drawnInstanceIds }))
 
     const timer = setTimeout(() => {
@@ -109,14 +136,16 @@ export function PlayScreen({
       if (game.counterPrompt) return game.counterPrompt.defenderId
 
       if (game.phase === 'objectives') {
-        if (!game.objectivePicks[1]) return 1
-        if (!game.objectivePicks[2]) return 2
+        for (const id of ids) {
+          if (!game.objectivePicks[id]) return id
+        }
         return current
       }
 
       if (game.phase === 'objective_reveal') {
-        if (!game.objectivesAck[1]) return 1
-        if (!game.objectivesAck[2]) return 2
+        for (const id of ids) {
+          if (!game.objectivesAck[id]) return id
+        }
         return current
       }
 
@@ -130,8 +159,11 @@ export function PlayScreen({
     game.activePlayer,
     game.objectivePicks[1],
     game.objectivePicks[2],
+    game.objectivePicks[3],
     game.objectivesAck[1],
     game.objectivesAck[2],
+    game.objectivesAck[3],
+    ids,
     game.counterPrompt?.defenderId,
   ])
 
@@ -203,28 +235,74 @@ export function PlayScreen({
   const isTreeTargeting =
     (selectedTemplate?.type === 'attack' && selectedTemplate.effect === 'obscure') ||
     isHandDoubleTree
-  const activePlayerState = game.activePlayer === 1 ? p1 : p2
+  const activePlayerState = getPlayer(game.players, game.activePlayer)
   const showActiveDoubleTrouble =
     game.phase === 'playing' && hasBuff(activePlayerState, 'double_trouble')
 
   const isLineOfSightTargeting =
     isHandTargeting || isCharTargeting || isDoubleHitSecond
-  const p1LineOfSightAttacker =
-    isLineOfSightTargeting && actorId === 2 ? (2 as const) : undefined
-  const p2LineOfSightAttacker =
-    isLineOfSightTargeting && actorId === 1 ? (1 as const) : undefined
 
+  const boardFlags = (boardPlayerId: PlayerId) => {
+    const enemy = boardPlayerId !== attackerId
+    const ally = boardPlayerId === attackerId
+    return {
+      targeting: (isHandTargeting || isCharTargeting || isDoubleHitSecond) && enemy,
+      lineOfSightAttackerId:
+        isLineOfSightTargeting && enemy ? attackerId : undefined,
+      laneTargeting: isLaneTargeting && enemy,
+      aoeTargeting: isAoeTargeting && enemy,
+      explosiveTargeting: (isExplosiveTargeting || isChaosTargeting) && enemy,
+      columnTargeting: isColumnTargeting && enemy,
+      allyTargeting: isAllyTargeting && ally,
+      treeTargeting: (isTreeTargeting || isTornadoDestination) && enemy,
+    }
+  }
+
+  const renderBoard = (
+    boardPlayerId: PlayerId,
+    playerState: typeof p1,
+    label: string,
+    boardRef: RefObject<HTMLDivElement | null>,
+    layout: 'vertical' | 'horizontal' = 'vertical',
+  ) => {
+    const flags = boardFlags(boardPlayerId)
+    return (
+      <Board
+        ref={boardRef}
+        slots={playerState.board}
+        playerId={boardPlayerId}
+        label={label}
+        layout={layout}
+        targeting={flags.targeting}
+        lineOfSightAttackerId={flags.lineOfSightAttackerId}
+        laneTargeting={flags.laneTargeting}
+        aoeTargeting={flags.aoeTargeting}
+        explosiveTargeting={flags.explosiveTargeting}
+        columnTargeting={flags.columnTargeting}
+        allyTargeting={flags.allyTargeting}
+        treeTargeting={flags.treeTargeting}
+        boardVfx={game.vfxQueue.filter(
+          (v) => v.targetPlayerId === boardPlayerId && BOARD_VFX_TYPES.has(v.vfx),
+        )}
+        onBoardVfxDone={(id) => dispatch({ type: 'POP_VFX', vfxId: id })}
+        onSlotClick={(row, col) => {
+          if (isOnline && myPlayerId !== boardPlayerId && game.phase === 'setup') return
+          dispatch({ type: 'BOARD_CLICK', boardPlayerId, row, col })
+        }}
+      />
+    )
+  }
   const abilityModalCharacter = (() => {
     if (!game.abilityModal) return null
-    const player = game.abilityModal.playerId === 1 ? p1 : p2
+    const player = getPlayer(game.players, game.abilityModal.playerId)
     const slot = player.board.find(
       (s) => s.row === game.abilityModal!.row && s.col === game.abilityModal!.col,
     )
     return slot?.character ?? null
   })()
-
   const viewerId = isOnline ? myPlayerId : actorId
   const ackPlayerId = isOnline ? myPlayerId : actorId
+  const viewerObjectives = getPlayer(game.players, viewerId).objectives
   const phaseLabel =
     game.phase === 'setup'
       ? 'Setup Mode'
@@ -253,9 +331,7 @@ export function PlayScreen({
         </button>
         <div className="play__status">
           {isOnline && (
-            <span className="play__online-tag">
-              {myPlayerId === 1 ? 'Host · Player 1' : 'Guest · Player 2'}
-            </span>
+            <span className="play__online-tag">{onlineRoleLabel(myPlayerId)}</span>
           )}
           <span className={`play__phase play__phase--${game.phase}`}>{phaseLabel}</span>
           {showActiveDoubleTrouble && <DoubleTroubleBadge active />}
@@ -275,20 +351,16 @@ export function PlayScreen({
 
       {!isOnline && game.phase === 'setup' && (
       <div className="play__player-tabs">
-        <button
-          type="button"
-          className={`play__tab${controllingPlayer === 1 ? ' play__tab--active' : ''}`}
-          onClick={() => setControllingPlayer(1)}
-        >
-          Control Player 1
-        </button>
-        <button
-          type="button"
-          className={`play__tab${controllingPlayer === 2 ? ' play__tab--active' : ''}`}
-          onClick={() => setControllingPlayer(2)}
-        >
-          Control Player 2
-        </button>
+        {ids.map((pid) => (
+          <button
+            key={pid}
+            type="button"
+            className={`play__tab${controllingPlayer === pid ? ' play__tab--active' : ''}`}
+            onClick={() => setControllingPlayer(pid)}
+          >
+            Control Player {pid}
+          </button>
+        ))}
       </div>
       )}
 
@@ -302,84 +374,91 @@ export function PlayScreen({
         ref={arenaWrapRef}
         className={`play__arena-wrap${victoryCinematicActive ? ' play__arena-wrap--victory' : ''}`}
       >
-        {game.phase === 'playing' && (!isOnline || viewerId === 1) && (
-          <ObjectivesPanel objectives={p1.objectives} side="left" showRaceHint={!isOnline} />
+        {game.phase === 'playing' && !isTriple && (!isOnline || viewerId === 1) && (
+          <ObjectivesPanel
+            objectives={p1.objectives}
+            side="left"
+            showRaceHint={!isOnline}
+            objectiveCount={3}
+          />
         )}
 
-        <div className="play__arena">
-        <Board
-          ref={p1BoardRef}
-          slots={p1.board}
-          playerId={1}
-          label="Player 1"
-          targeting={(isHandTargeting || isCharTargeting || isDoubleHitSecond) && attackerId === 2}
-          lineOfSightAttackerId={p1LineOfSightAttacker}
-          laneTargeting={isLaneTargeting && attackerId === 2}
-          aoeTargeting={isAoeTargeting && attackerId === 2}
-          explosiveTargeting={(isExplosiveTargeting || isChaosTargeting) && attackerId === 2}
-          columnTargeting={isColumnTargeting && attackerId === 2}
-          allyTargeting={isAllyTargeting && attackerId === 1}
-          boardVfx={game.vfxQueue.filter((v) => v.targetPlayerId === 1 && BOARD_VFX_TYPES.has(v.vfx))}
-          onBoardVfxDone={(id) => dispatch({ type: 'POP_VFX', vfxId: id })}
-          onSlotClick={(row, col) => {
-            if (isOnline && myPlayerId !== 1 && game.phase === 'setup') return
-            dispatch({ type: 'BOARD_CLICK', boardPlayerId: 1, row, col })
-          }}
-        />
-
-        <div className="play__center">
-          <div className="play__legend">
-            <span className="legend legend--character">Character</span>
-            <span className="legend legend--attack">Attack</span>
-            <span className="legend legend--passive">Passive</span>
-            <span className="legend legend--special">Special</span>
-          </div>
-          {game.phase === 'setup' && (
-            <p className="play__setup-hint">
-              Full card pool in each deck — all characters, attacks, specials, and passives (including Thorn Mail, Regrowth, Gamble).
-            </p>
-          )}
-          {game.phase === 'playing' && (
-            <p className="play__setup-hint">
-              Tap characters for abilities. 1 action/turn — play a card, reroll your deck, or pass. Hand refills after actions.
-            </p>
-          )}
-          {game.refillEffect && (
-            <div className="play__refill-toast">
-              +{game.refillEffect.cardsDrawn} cards drawn!
+        <div className={`play__arena${isTriple ? ' play__arena--triple' : ''}`}>
+          {isTriple && p3 && (
+            <div className="play__arena-top">
+              {renderBoard(3, p3, 'Player 3', p3BoardRef, 'horizontal')}
             </div>
           )}
+
+          {isTriple ? (
+            <div className="play__arena-sides">
+              {renderBoard(1, p1, 'Player 1', p1BoardRef)}
+
+              <div className="play__center play__center--triple">
+                {game.phase === 'playing' && (
+                  <ObjectivesPanel
+                    objectives={viewerObjectives}
+                    side="center"
+                    showRaceHint={!isOnline}
+                    objectiveCount={4}
+                  />
+                )}
+                {game.refillEffect && (
+                  <div className="play__refill-toast">
+                    +{game.refillEffect.cardsDrawn} cards drawn!
+                  </div>
+                )}
+              </div>
+
+              {renderBoard(2, p2, 'Player 2', p2BoardRef)}
+            </div>
+          ) : (
+            <>
+              {renderBoard(1, p1, 'Player 1', p1BoardRef)}
+
+              <div className="play__center">
+                <div className="play__legend">
+                  <span className="legend legend--character">Character</span>
+                  <span className="legend legend--attack">Attack</span>
+                  <span className="legend legend--passive">Passive</span>
+                  <span className="legend legend--special">Special</span>
+                </div>
+                {game.phase === 'setup' && (
+                  <p className="play__setup-hint">
+                    Full card pool in each deck — all characters, attacks, specials, and passives (including Thorn Mail, Regrowth, Gamble).
+                  </p>
+                )}
+                {game.phase === 'playing' && (
+                  <p className="play__setup-hint">
+                    Tap characters for abilities. 1 action/turn — play a card, reroll your deck, or pass. Hand refills after actions.
+                  </p>
+                )}
+                {game.refillEffect && (
+                  <div className="play__refill-toast">
+                    +{game.refillEffect.cardsDrawn} cards drawn!
+                  </div>
+                )}
+              </div>
+
+              {renderBoard(2, p2, 'Player 2', p2BoardRef)}
+            </>
+          )}
         </div>
 
-        <Board
-          ref={p2BoardRef}
-          slots={p2.board}
-          playerId={2}
-          label="Player 2"
-          targeting={(isHandTargeting || isCharTargeting || isDoubleHitSecond) && attackerId === 1}
-          lineOfSightAttackerId={p2LineOfSightAttacker}
-          laneTargeting={isLaneTargeting && attackerId === 1}
-          aoeTargeting={isAoeTargeting && attackerId === 1}
-          explosiveTargeting={(isExplosiveTargeting || isChaosTargeting) && attackerId === 1}
-          columnTargeting={isColumnTargeting && attackerId === 1}
-          treeTargeting={(isTreeTargeting || isTornadoDestination) && attackerId === 1}
-          boardVfx={game.vfxQueue.filter((v) => v.targetPlayerId === 2 && BOARD_VFX_TYPES.has(v.vfx))}
-          onBoardVfxDone={(id) => dispatch({ type: 'POP_VFX', vfxId: id })}
-          onSlotClick={(row, col) => {
-            if (isOnline && myPlayerId !== 2 && game.phase === 'setup') return
-            dispatch({ type: 'BOARD_CLICK', boardPlayerId: 2, row, col })
-          }}
-        />
-        </div>
-
-        {game.phase === 'playing' && (!isOnline || viewerId === 2) && (
-          <ObjectivesPanel objectives={p2.objectives} side="right" showRaceHint={!isOnline} />
+        {game.phase === 'playing' && !isTriple && (!isOnline || viewerId === 2) && (
+          <ObjectivesPanel
+            objectives={p2.objectives}
+            side="right"
+            showRaceHint={!isOnline}
+            objectiveCount={3}
+          />
         )}
       </div>
 
       {game.phase === 'objectives' && (
         <ObjectivesIntro
           myPlayerId={ackPlayerId}
+          playerCount={playerCount}
           draftOptions={game.objectiveDraftOptions}
           picks={game.objectivePicks}
           deadlineMs={game.objectivesDeadlineMs}
@@ -391,6 +470,7 @@ export function PlayScreen({
       {game.phase === 'objective_reveal' && (
         <ObjectivesReveal
           myPlayerId={ackPlayerId}
+          playerCount={playerCount}
           matchObjectives={p1.objectives}
           picks={game.objectivePicks}
           randomPickId={game.objectiveRandomPick}
@@ -404,7 +484,7 @@ export function PlayScreen({
       {victoryCinematicActive && game.winner != null && (
         <VictoryCinematic
           winnerId={game.winner}
-          boardRef={game.winner === 1 ? p1BoardRef : p2BoardRef}
+          boardRef={boardRefs[game.winner]}
           arenaWrapRef={arenaWrapRef}
           onComplete={() => setShowVictoryMenu(true)}
         />
@@ -448,7 +528,7 @@ export function PlayScreen({
         (!isOnline || game.counterPrompt.defenderId === myPlayerId) && (
         <CounterPromptModal
           prompt={game.counterPrompt}
-          defenderHand={(game.counterPrompt.defenderId === 1 ? p1 : p2).hand}
+          defenderHand={getPlayer(game.players, game.counterPrompt.defenderId).hand}
           onMirror={() => dispatch({ type: 'MIRROR_COUNTER' })}
           onSpellBook={() => dispatch({ type: 'SPELLBOOK_COUNTER' })}
           onChainLocked={() => dispatch({ type: 'CHAIN_COUNTER' })}
@@ -465,10 +545,10 @@ export function PlayScreen({
         </div>
       )}
 
-      <div className="play__players">
-        {[1 as const, 2 as const].map((pid) => {
-          const player = pid === 1 ? p1 : p2
-          const key = pid === 1 ? 'p1' : 'p2'
+      <div className={`play__players${isTriple ? ' play__players--triple' : ''}`}>
+        {ids.map((pid) => {
+          const player = getPlayer(game.players, pid)
+          const key = refillKey(pid)
           return (
             <div
               key={pid}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import './MultiplayerMenuScreen.css'
 
 interface MultiplayerMenuScreenProps {
+  playerCount: 2 | 3
   onBack: () => void
   onHost: () => void
   onJoin: (code: string) => void
@@ -12,6 +13,7 @@ interface MultiplayerMenuScreenProps {
 }
 
 export function MultiplayerMenuScreen({
+  playerCount,
   onBack,
   onHost,
   onJoin,
@@ -29,10 +31,11 @@ export function MultiplayerMenuScreen({
         <button type="button" className="mp-menu__back" onClick={onBack}>
           ← Back
         </button>
-        <h1 className="mp-menu__title">Multiplayer</h1>
+        <h1 className="mp-menu__title">Multiplayer · {playerCount} Players</h1>
         <p className="mp-menu__subtitle">
           Host a game and share your 4-letter code, or join with a friend&apos;s code. You won&apos;t
           see each other&apos;s cards.
+          {playerCount === 3 && ' Triple player needs the host plus two guests with the same code.'}
         </p>
         <p className="mp-menu__hint">
           Host must click Host first, then guest joins. If you see an old error, hard-refresh the page
@@ -46,7 +49,9 @@ export function MultiplayerMenuScreen({
           <div className="mp-menu__code-box">
             <span className="mp-menu__code-label">Room code</span>
             <span className="mp-menu__code">{roomCode}</span>
-            <span className="mp-menu__code-hint">Share this with Player 2</span>
+            <span className="mp-menu__code-hint">
+              Share this code with {playerCount === 3 ? 'Players 2 & 3' : 'Player 2'}
+            </span>
           </div>
         )}
 

@@ -1,6 +1,6 @@
 import { getTemplate } from './cards'
 import type { CardType, GameState, PlayerObjective, PlayerState } from './types'
-import { OBJECTIVE_POOL, createObjectiveFromDef } from './objectives'
+import { OBJECTIVE_POOL, createObjectiveFromDef, objectiveDraftCount } from './objectives'
 
 type ObjectiveDef = (typeof OBJECTIVE_POOL)[number]
 type ObjectiveTrack = ObjectiveDef['track']
@@ -27,16 +27,13 @@ function playerCardPool(player: PlayerState): { templateId: string }[] {
   return [...player.deck, ...player.hand, ...boardChars]
 }
 
-/** Upper bounds for objective targets given both players' available cards at match start. */
+/** Upper bounds for objective targets given all players' available cards at match start. */
 export function getMatchResourceLimits(state: GameState): MatchResourceLimits {
-  const [p1, p2] = state.players
-  const p1Counts = countCardsByType(playerCardPool(p1))
-  const p2Counts = countCardsByType(playerCardPool(p2))
-
-  const minChars = Math.min(p1Counts.character, p2Counts.character)
-  const minAttacks = Math.min(p1Counts.attack, p2Counts.attack)
-  const minSpecials = Math.min(p1Counts.special, p2Counts.special)
-  const totalAttacks = p1Counts.attack + p2Counts.attack
+  const counts = state.players.map((p) => countCardsByType(playerCardPool(p)))
+  const minChars = Math.min(...counts.map((c) => c.character))
+  const minAttacks = Math.min(...counts.map((c) => c.attack))
+  const minSpecials = Math.min(...counts.map((c) => c.special))
+  const totalAttacks = counts.reduce((sum, c) => sum + c.attack, 0)
 
   return {
     eliminations: minChars,
@@ -70,20 +67,21 @@ export function rollDraftOptions(state: GameState): PlayerObjective[] {
   const feasible = getFeasibleObjectiveDefs(state)
   const pool = feasible.length > 0 ? feasible : [...OBJECTIVE_POOL]
   const shuffled = shuffle(pool)
+  const draftCount = objectiveDraftCount(state.playerCount)
 
   const picks: ObjectiveDef[] = []
   for (const def of shuffled) {
-    if (picks.length >= 8) break
+    if (picks.length >= draftCount) break
     if (!picks.some((p) => p.id === def.id)) picks.push(def)
   }
 
-  if (picks.length < 8) {
+  if (picks.length < draftCount) {
     const sorted = [...pool].sort((a, b) => a.target - b.target)
     for (const def of sorted) {
-      if (picks.length >= 8) break
+      if (picks.length >= draftCount) break
       if (!picks.some((p) => p.id === def.id)) picks.push(def)
     }
   }
 
-  return picks.map(createObjectiveFromDef)
+  return picks.map((def) => createObjectiveFromDef(def, state.playerCount))
 }

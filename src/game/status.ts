@@ -1,9 +1,12 @@
 import { getTemplate } from './cards'
+import { getPlayer, playerIds } from './players'
 import type {
   BoardCharacter,
   BoardSlot,
   CardInstance,
   GameState,
+  PlayerCount,
+  PlayerId,
   PlayerState,
   VfxEvent,
 } from './types'
@@ -152,7 +155,7 @@ export function applyHauntStatus(
   char: BoardCharacter,
   duration = 2,
   dotDamage = 10,
-  appliedBy?: 1 | 2,
+  appliedBy?: PlayerId,
 ): BoardCharacter {
   return {
     ...char,
@@ -190,14 +193,15 @@ export function consumePendingBuff(
 }
 
 export function triggerBreadOnElimination(
-  players: [PlayerState, PlayerState],
-  updatePlayerFn: (p: [PlayerState, PlayerState], id: 1 | 2, u: PlayerState) => [PlayerState, PlayerState],
-): { players: [PlayerState, PlayerState]; vfx: VfxEvent[]; messages: string[] } {
+  players: PlayerState[],
+  updatePlayerFn: (p: PlayerState[], id: PlayerId, u: PlayerState) => PlayerState[],
+  playerCount: PlayerCount = 2,
+): { players: PlayerState[]; vfx: VfxEvent[]; messages: string[] } {
   const vfx: VfxEvent[] = []
   const messages: string[] = []
   let result = players
-  for (const pid of [1, 2] as const) {
-    const p = pid === 1 ? result[0] : result[1]
+  for (const pid of playerIds(playerCount)) {
+    const p = getPlayer(result, pid)
     if (!p.pendingBuffs.some((b) => b.type === 'bread')) continue
     const healed = healAllBoardCharacters(p, 5)
     result = updatePlayerFn(result, pid, healed)
@@ -318,11 +322,11 @@ export function tickStatusesAndDots(player: PlayerState): {
   player: PlayerState
   messages: string[]
   vfx: VfxEvent[]
-  dotDamageByPlayer: Partial<Record<1 | 2, number>>
+  dotDamageByPlayer: Partial<Record<PlayerId, number>>
 } {
   const messages: string[] = []
   const vfx: VfxEvent[] = []
-  const dotDamageByPlayer: Partial<Record<1 | 2, number>> = {}
+  const dotDamageByPlayer: Partial<Record<PlayerId, number>> = {}
   let eliminated = [...player.eliminated]
 
   const board = player.board.map((slot) => {
@@ -343,7 +347,7 @@ export function tickStatusesAndDots(player: PlayerState): {
             targets: [{ row: slot.row, col: slot.col, name }],
           }),
         )
-        if (status.appliedBy === 1 || status.appliedBy === 2) {
+        if (status.appliedBy === 1 || status.appliedBy === 2 || status.appliedBy === 3) {
           dotDamageByPlayer[status.appliedBy] = (dotDamageByPlayer[status.appliedBy] ?? 0) + dmg
         }
         if (!result.slot.character) {
@@ -455,8 +459,8 @@ export function isTargetBlockedByCharacter(
   defenderBoard: BoardSlot[],
   targetRow: number,
   targetCol: number,
-  attackerId: 1 | 2,
-  defenderId: 1 | 2,
+  attackerId: PlayerId,
+  defenderId: PlayerId,
 ): boolean {
   if (attackerId === defenderId) return false
 
@@ -477,7 +481,7 @@ const THORN_MAIL_DAMAGE = 3
 
 function findThornRetaliationTarget(
   attacker: PlayerState,
-  attackerId: 1 | 2,
+  attackerId: PlayerId,
   preferredRow?: number,
   preferredCol?: number,
 ): { row: number; col: number } | null {
@@ -497,19 +501,19 @@ function findThornRetaliationTarget(
 }
 
 export function applyThornMailRetaliation(
-  players: [PlayerState, PlayerState],
-  defenderId: 1 | 2,
-  attackerId: 1 | 2,
-  updatePlayerFn: (p: [PlayerState, PlayerState], id: 1 | 2, u: PlayerState) => [PlayerState, PlayerState],
+  players: PlayerState[],
+  defenderId: PlayerId,
+  attackerId: PlayerId,
+  updatePlayerFn: (p: PlayerState[], id: PlayerId, u: PlayerState) => PlayerState[],
   vfxList: VfxEvent[],
   attackerRow?: number,
   attackerCol?: number,
-): [PlayerState, PlayerState] {
+): PlayerState[] {
   if (attackerId === defenderId) return players
-  const defender = defenderId === 1 ? players[0] : players[1]
+  const defender = getPlayer(players, defenderId)
   if (!defender.pendingBuffs.some((b) => b.type === 'thorn_mail')) return players
 
-  const attacker = attackerId === 1 ? players[0] : players[1]
+  const attacker = getPlayer(players, attackerId)
   const target = findThornRetaliationTarget(attacker, attackerId, attackerRow, attackerCol)
   if (!target) return players
 

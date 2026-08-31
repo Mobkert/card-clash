@@ -1,7 +1,7 @@
 import { getTemplate } from './cards'
 import { TEST_CARD_IDS } from './cards'
 import { emptyObjectiveStats } from './objectives'
-import type { CardInstance, CardType, PlayerState } from './types'
+import type { CardInstance, CardType, PlayerId, PlayerState } from './types'
 import { BOARD_COLS, BOARD_ROWS, DEFAULT_MAX_PASSIVES, DECK_SIZE, MAX_HAND_SIZE } from './types'
 import { createEmptySlot } from './status'
 
@@ -111,7 +111,7 @@ export function createEmptyBoard() {
   return board
 }
 
-export function createPlayer(id: 1 | 2): PlayerState {
+export function createPlayer(id: PlayerId): PlayerState {
   return {
     id,
     deck: buildDeck(),

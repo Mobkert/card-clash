@@ -1,10 +1,12 @@
 import { Confetti } from './Confetti'
 import './VictoryScreen.css'
 
+import type { PlayerId } from '../game/types'
+
 interface VictoryScreenProps {
-  winnerId: 1 | 2
+  winnerId: PlayerId
   isOnline: boolean
-  myPlayerId: 1 | 2
+  myPlayerId: PlayerId
   canRematch: boolean
   onRematch: () => void
   onLeave: () => void

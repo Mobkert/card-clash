@@ -18,11 +18,12 @@ import {
   useSpecialNoTarget,
   useSpellBookCounter,
 } from './engine'
-import type { GameState } from './types'
+import { getPlayer } from './players'
+import type { GameState, PlayerId } from './types'
 
 export type ClientAction =
   | { type: 'SELECT_CARD'; cardInstanceId: string }
-  | { type: 'BOARD_CLICK'; boardPlayerId: 1 | 2; row: number; col: number }
+  | { type: 'BOARD_CLICK'; boardPlayerId: PlayerId; row: number; col: number }
   | { type: 'START_GAME' }
   | { type: 'CLICK_DECK' }
   | { type: 'USE_PASSIVE' }
@@ -42,14 +43,14 @@ export type ClientAction =
   | { type: 'TICK_OBJECTIVES' }
   | { type: 'REMATCH' }
 
-function findHandCard(state: GameState, playerId: 1 | 2, instanceId: string) {
-  const player = state.players[playerId === 1 ? 0 : 1]
+function findHandCard(state: GameState, playerId: PlayerId, instanceId: string) {
+  const player = getPlayer(state.players, playerId)
   return player.hand.find((c) => c.instanceId === instanceId) ?? null
 }
 
 export function applyGameAction(
   state: GameState,
-  playerId: 1 | 2,
+  playerId: PlayerId,
   action: ClientAction,
 ): GameState {
   switch (action.type) {

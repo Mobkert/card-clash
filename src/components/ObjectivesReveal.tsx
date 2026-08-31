@@ -1,22 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import { OBJECTIVES_INTRO_MS } from '../game/objectives'
-import type { PlayerObjective } from '../game/types'
+import { playerIds } from '../game/players'
+import type { PlayerCount, PlayerId, PlayerObjective } from '../game/types'
 import './ObjectivesReveal.css'
 
 const REVEAL_STEP_MS = 1400
 
 type RevealSlot = {
   objective: PlayerObjective
-  source: 'p1' | 'p2' | 'random'
+  source: 'p1' | 'p2' | 'p3' | 'random'
   title: string
 }
 
 interface ObjectivesRevealProps {
-  myPlayerId: 1 | 2
+  myPlayerId: PlayerId
+  playerCount: PlayerCount
   matchObjectives: PlayerObjective[]
-  picks: { 1: string | null; 2: string | null }
+  picks: Record<PlayerId, string | null>
   randomPickId: string | null
-  objectivesAck: { 1: boolean; 2: boolean }
+  objectivesAck: Record<PlayerId, boolean>
   deadlineMs: number | null
   isOnline: boolean
   onAck: () => void
@@ -24,6 +26,7 @@ interface ObjectivesRevealProps {
 
 export function ObjectivesReveal({
   myPlayerId,
+  playerCount,
   matchObjectives,
   picks,
   randomPickId,
@@ -32,27 +35,41 @@ export function ObjectivesReveal({
   isOnline,
   onAck,
 }: ObjectivesRevealProps) {
+  const ids = playerIds(playerCount)
+  const matchObjectiveTotal = playerCount === 3 ? 4 : 3
+
   const revealSlots = useMemo((): RevealSlot[] => {
     const slots: RevealSlot[] = []
-    const p1Obj = matchObjectives.find((o) => o.id === picks[1])
-    const p2Obj = matchObjectives.find((o) => o.id === picks[2])
+    const sourceFor = (id: PlayerId): RevealSlot['source'] =>
+      id === 1 ? 'p1' : id === 2 ? 'p2' : 'p3'
+
+    for (const id of ids) {
+      const obj = matchObjectives.find((o) => o.id === picks[id])
+      if (obj) slots.push({ objective: obj, source: sourceFor(id), title: `Player ${id} chose` })
+    }
+
     const randomObj =
       matchObjectives.find((o) => o.id === randomPickId) ??
-      matchObjectives.find((o) => o.id !== picks[1] && o.id !== picks[2])
+      matchObjectives.find((o) => !ids.some((id) => picks[id] === o.id))
 
-    if (p1Obj) slots.push({ objective: p1Obj, source: 'p1', title: 'Player 1 chose' })
-    if (p2Obj) slots.push({ objective: p2Obj, source: 'p2', title: 'Player 2 chose' })
     if (randomObj) slots.push({ objective: randomObj, source: 'random', title: 'Random objective!' })
 
     if (slots.length === 0) {
-      return matchObjectives.slice(0, 3).map((objective, i) => ({
+      return matchObjectives.slice(0, matchObjectiveTotal).map((objective, i) => ({
         objective,
-        source: (i === 0 ? 'p1' : i === 1 ? 'p2' : 'random') as RevealSlot['source'],
-        title: i === 0 ? 'Player 1 chose' : i === 1 ? 'Player 2 chose' : 'Random objective!',
+        source: (i === 0 ? 'p1' : i === 1 ? 'p2' : i === 2 ? 'p3' : 'random') as RevealSlot['source'],
+        title:
+          i === 0
+            ? 'Player 1 chose'
+            : i === 1
+              ? 'Player 2 chose'
+              : i === 2 && playerCount === 3
+                ? 'Player 3 chose'
+                : 'Random objective!',
       }))
     }
     return slots
-  }, [matchObjectives, picks, randomPickId])
+  }, [matchObjectives, picks, randomPickId, ids, matchObjectiveTotal, playerCount])
 
   const [step, setStep] = useState(0)
   const [secondsLeft, setSecondsLeft] = useState(() =>
@@ -64,7 +81,7 @@ export function ObjectivesReveal({
 
   useEffect(() => {
     setStep(0)
-  }, [revealSlots.length, picks[1], picks[2], randomPickId])
+  }, [revealSlots.length, picks[1], picks[2], picks[3], randomPickId])
 
   useEffect(() => {
     if (step >= revealSlots.length) return undefined
@@ -85,16 +102,10 @@ export function ObjectivesReveal({
   }, [deadlineMs, revealComplete])
 
   const myReady = objectivesAck[myPlayerId]
-  const oppId: 1 | 2 = myPlayerId === 1 ? 2 : 1
-  const oppReady = objectivesAck[oppId]
-  const localAckPlayer: 1 | 2 | null = isOnline
-    ? null
-    : !objectivesAck[1]
-      ? 1
-      : !objectivesAck[2]
-        ? 2
-        : null
+  const waitingAckId = ids.find((id) => !objectivesAck[id] && id !== myPlayerId)
+  const localAckPlayer: PlayerId | null = isOnline ? null : ids.find((id) => !objectivesAck[id]) ?? null
   const canAck = isOnline || localAckPlayer === myPlayerId
+  const allReady = ids.every((id) => objectivesAck[id])
 
   return (
     <div className="objectives-reveal" role="dialog" aria-modal="true" aria-labelledby="objectives-reveal-title">
@@ -123,7 +134,7 @@ export function ObjectivesReveal({
         <div className="objectives-reveal__summary">
           <h2 className="objectives-reveal__summary-title">Match Objectives</h2>
           <p className="objectives-reveal__summary-hint">
-            Complete all three before your opponent to win! Press Next — or auto-start in{' '}
+            Complete all {matchObjectiveTotal} before your opponents to win! Press Next — or auto-start in{' '}
             <strong>{secondsLeft}s</strong>.
           </p>
 
@@ -137,12 +148,11 @@ export function ObjectivesReveal({
           </ul>
 
           <div className="objectives-reveal__ready-row">
-            <span className={`objectives-reveal__ready${objectivesAck[1] ? ' objectives-reveal__ready--done' : ''}`}>
-              Player 1 {objectivesAck[1] ? '✓ Ready' : '…'}
-            </span>
-            <span className={`objectives-reveal__ready${objectivesAck[2] ? ' objectives-reveal__ready--done' : ''}`}>
-              Player 2 {objectivesAck[2] ? '✓ Ready' : '…'}
-            </span>
+            {ids.map((id) => (
+              <span key={id} className={`objectives-reveal__ready${objectivesAck[id] ? ' objectives-reveal__ready--done' : ''}`}>
+                Player {id} {objectivesAck[id] ? '✓ Ready' : '…'}
+              </span>
+            ))}
           </div>
 
           {!myReady && canAck && (
@@ -153,10 +163,10 @@ export function ObjectivesReveal({
           {!myReady && !canAck && !isOnline && (
             <p className="objectives-reveal__waiting">Waiting for Player {localAckPlayer}…</p>
           )}
-          {myReady && !oppReady && (
-            <p className="objectives-reveal__waiting">Waiting for opponent…</p>
+          {myReady && waitingAckId && (
+            <p className="objectives-reveal__waiting">Waiting for Player {waitingAckId}…</p>
           )}
-          {myReady && oppReady && <p className="objectives-reveal__waiting">Starting game…</p>}
+          {myReady && allReady && <p className="objectives-reveal__waiting">Starting game…</p>}
         </div>
       )}
     </div>
