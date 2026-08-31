@@ -1836,6 +1836,14 @@ function hasAnyCounterInHand(player: PlayerState): boolean {
   return hasMirrorInHand(player) || hasSpellBookInHand(player) || hasChainLockedInHand(player)
 }
 
+function hasCounterForPlayedKind(
+  player: PlayerState,
+  playedKind: 'attack' | 'special',
+): boolean {
+  if (playedKind === 'attack') return hasAnyCounterInHand(player)
+  return hasChainLockedInHand(player)
+}
+
 function findMirrorCard(player: PlayerState): CardInstance | null {
   return player.hand.find((c) => c.templateId === 'spc_mirror') ?? null
 }
@@ -1890,7 +1898,7 @@ function tryOpenCounterPrompt(
 
   const defenderId = playedKind === 'attack' ? targetPlayerId : (attackerId === 1 ? 2 : 1)
   const defender = getPlayer(state.players, defenderId)
-  if (!hasAnyCounterInHand(defender)) return null
+  if (!hasCounterForPlayedKind(defender, playedKind)) return null
 
   return {
     ...state,
@@ -2316,6 +2324,10 @@ export function useMirrorCounter(state: GameState, defenderId: 1 | 2): GameState
     return { ...state, message: 'No Mirror card in hand.' }
   }
 
+  if (prompt.playedKind === 'special') {
+    return { ...state, message: 'Mirror cannot reflect special cards!' }
+  }
+
   const { attackerId, playedCard, targetRow, targetCol } = prompt
 
   const attacker = getPlayer(state.players, attackerId)
@@ -2375,6 +2387,10 @@ export function useSpellBookCounter(state: GameState, defenderId: 1 | 2): GameSt
   const spellBook = findSpellBookCard(defender)
   if (!spellBook) {
     return { ...state, message: 'No Spell Book in hand.' }
+  }
+
+  if (prompt.playedKind === 'special') {
+    return { ...state, message: 'Spell Book cannot counter special cards!' }
   }
 
   const stolen = createCardInstance(prompt.playedCard.templateId)

@@ -24,8 +24,8 @@ export function CounterPromptModal({
 }: CounterPromptModalProps) {
   const [secondsLeft, setSecondsLeft] = useState(5)
 
-  const hasMirror = defenderHand.some((c) => c.templateId === 'spc_mirror')
-  const hasSpellBook = defenderHand.some((c) => c.templateId === 'atk_spell_book')
+  const hasMirror = prompt.playedKind === 'attack' && defenderHand.some((c) => c.templateId === 'spc_mirror')
+  const hasSpellBook = prompt.playedKind === 'attack' && defenderHand.some((c) => c.templateId === 'atk_spell_book')
   const hasChainLocked = defenderHand.some((c) => c.templateId === 'atk_chain_locked')
 
   const playedName = getTemplate(prompt.playedCard.templateId).name
