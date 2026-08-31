@@ -38,8 +38,15 @@
 .mp-menu__subtitle {
   color: rgba(255, 255, 255, 0.65);
   line-height: 1.5;
-  margin: 0 0 1.5rem;
+  margin: 0 0 0.75rem;
   font-size: 0.95rem;
+}
+
+.mp-menu__hint {
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.45;
+  margin: 0 0 1.25rem;
+  font-size: 0.85rem;
 }
 
 .mp-menu__actions {

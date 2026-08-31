@@ -31,8 +31,12 @@ export function MultiplayerMenuScreen({
         </button>
         <h1 className="mp-menu__title">Multiplayer</h1>
         <p className="mp-menu__subtitle">
-          Host a game and share your code, or join with a friend&apos;s code. You won&apos;t see each
-          other&apos;s cards.
+          Host a game and share your 4-letter code, or join with a friend&apos;s code. You won&apos;t
+          see each other&apos;s cards.
+        </p>
+        <p className="mp-menu__hint">
+          Host must click Host first, then guest joins. If you see an old error, hard-refresh the page
+          (Ctrl+Shift+R).
         </p>
 
         {error && <p className="mp-menu__error">{error}</p>}
@@ -72,8 +76,8 @@ export function MultiplayerMenuScreen({
             <input
               className="mp-menu__input"
               type="text"
-              maxLength={6}
-              placeholder="Enter code"
+              maxLength={4}
+              placeholder="4-letter code"
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
             />

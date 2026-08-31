@@ -5,7 +5,11 @@ import { MultiplayerMenuScreen } from './screens/MultiplayerMenuScreen'
 import { PlayScreen } from './screens/PlayScreen'
 import type { ClientAction } from './game/applyGameAction'
 import type { GameState } from './game/types'
-import { MultiplayerClient, type MultiplayerCallbacks } from './net/multiplayerClient'
+import {
+  MultiplayerClient,
+  setActiveMultiplayerClient,
+  type MultiplayerCallbacks,
+} from './net/multiplayerClient'
 import { generatePlayTheme, MENU_THEME, type PlayTheme } from './theme/playTheme'
 import './App.css'
 
@@ -21,6 +25,7 @@ function App() {
   const [onlineGame, setOnlineGame] = useState<GameState | null>(null)
   const [myPlayerId, setMyPlayerId] = useState<1 | 2>(1)
   const mpClientRef = useRef<MultiplayerClient | null>(null)
+  const mpBusyRef = useRef(false)
 
   const enterOnlinePlay = useCallback(() => {
     setPlayTheme(generatePlayTheme())
@@ -28,7 +33,7 @@ function App() {
   }, [])
 
   const resetMultiplayer = useCallback(() => {
-    mpClientRef.current?.disconnect()
+    setActiveMultiplayerClient(null)
     mpClientRef.current = null
     setMpStatus('')
     setMpCode(null)
@@ -61,7 +66,7 @@ function App() {
         setMpConnecting(false)
       },
       onDisconnect: () => {
-        setMpError('Opponent disconnected.')
+        setMpError('Your opponent disconnected.')
         setMpConnecting(false)
       },
     }),
@@ -85,13 +90,15 @@ function App() {
   }
 
   const handleHost = async () => {
+    if (mpBusyRef.current) return
+    mpBusyRef.current = true
     setMpConnecting(true)
     setMpError(null)
-    mpClientRef.current?.disconnect()
-    mpClientRef.current = null
+    setMpCode(null)
     setMyPlayerId(1)
 
     const client = new MultiplayerClient(1, makeCallbacks())
+    setActiveMultiplayerClient(client)
     mpClientRef.current = client
 
     try {
@@ -100,17 +107,20 @@ function App() {
       /* onError callback handles messaging */
     } finally {
       setMpConnecting(false)
+      mpBusyRef.current = false
     }
   }
 
   const handleJoin = async (code: string) => {
+    if (mpBusyRef.current) return
+    mpBusyRef.current = true
     setMpConnecting(true)
     setMpError(null)
-    mpClientRef.current?.disconnect()
-    mpClientRef.current = null
+    setMpCode(null)
     setMyPlayerId(2)
 
     const client = new MultiplayerClient(2, makeCallbacks())
+    setActiveMultiplayerClient(client)
     mpClientRef.current = client
 
     try {
@@ -119,6 +129,7 @@ function App() {
       /* onError callback handles messaging */
     } finally {
       setMpConnecting(false)
+      mpBusyRef.current = false
     }
   }
 
