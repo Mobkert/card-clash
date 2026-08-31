@@ -1,0 +1,122 @@
+.hand {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+  min-height: 130px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  transition: box-shadow 0.3s;
+}
+
+.hand--empty {
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.85rem;
+}
+
+.hand--refilling {
+  box-shadow: 0 0 24px rgba(255, 215, 0, 0.35), inset 0 0 20px rgba(255, 215, 0, 0.08);
+  animation: hand-glow 0.8s ease;
+}
+
+@keyframes hand-glow {
+  0% { box-shadow: 0 0 0 rgba(255, 215, 0, 0); }
+  40% { box-shadow: 0 0 32px rgba(255, 215, 0, 0.5), inset 0 0 24px rgba(255, 215, 0, 0.12); }
+  100% { box-shadow: 0 0 24px rgba(255, 215, 0, 0.35), inset 0 0 20px rgba(255, 215, 0, 0.08); }
+}
+
+.hand__refill-burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.hand__refill-spark {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #ffd700;
+  border-radius: 50%;
+  top: 50%;
+  left: 10%;
+  animation: spark-fly 0.7s ease forwards;
+  box-shadow: 0 0 8px #ffd700;
+}
+
+.hand__refill-spark--2 {
+  left: 50%;
+  animation-delay: 0.1s;
+}
+
+.hand__refill-spark--3 {
+  left: 80%;
+  animation-delay: 0.2s;
+}
+
+@keyframes spark-fly {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(40px, -30px) scale(0); opacity: 0; }
+}
+
+.hand__card-wrap {
+  position: relative;
+}
+
+.hand__card-wrap--draw {
+  animation: card-draw 0.5s ease backwards;
+}
+
+@keyframes card-draw {
+  0% {
+    transform: translateY(-40px) scale(0.6) rotate(-8deg);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(4px) scale(1.05) rotate(2deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1) rotate(0);
+    opacity: 1;
+  }
+}
+
+.hand__passive-btn {
+  align-self: center;
+  padding: 8px 16px;
+  background: #2196f3;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.hand__passive-btn:hover {
+  background: #1976d2;
+}
+
+.hand__refill-label {
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #ffd700;
+  animation: label-pop 0.6s ease;
+  white-space: nowrap;
+}
+
+@keyframes label-pop {
+  0% { transform: translateX(-50%) scale(0.5); opacity: 0; }
+  50% { transform: translateX(-50%) scale(1.1); opacity: 1; }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}

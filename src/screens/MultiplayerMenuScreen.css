@@ -1,0 +1,147 @@
+.mp-menu {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mp-menu__content {
+  position: relative;
+  text-align: center;
+  padding: 2.5rem 2rem;
+  background: rgba(15, 20, 60, 0.55);
+  border: 3px solid rgba(255, 255, 255, 0.18);
+  border-radius: 24px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  max-width: 440px;
+  width: 100%;
+}
+
+.mp-menu__back {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.mp-menu__title {
+  margin: 0 0 0.75rem;
+  font-size: 2.4rem;
+  color: #81d4fa;
+}
+
+.mp-menu__subtitle {
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.5;
+  margin: 0 0 1.5rem;
+  font-size: 0.95rem;
+}
+
+.mp-menu__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mp-menu__btn {
+  font-size: 1.15rem;
+  padding: 14px 24px;
+  border-radius: 14px;
+  border: 3px solid #1a1030;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.15s;
+}
+
+.mp-menu__btn:hover:not(:disabled) {
+  transform: scale(1.03);
+}
+
+.mp-menu__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mp-menu__btn--host {
+  background: linear-gradient(135deg, #ffd700, #ff9800);
+  color: #1a1a2e;
+}
+
+.mp-menu__btn--join {
+  background: linear-gradient(135deg, #64b5f6, #7e57c2);
+  color: #fff;
+}
+
+.mp-menu__join {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mp-menu__input {
+  font-size: 1.5rem;
+  letter-spacing: 0.2em;
+  text-align: center;
+  padding: 12px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-family: inherit;
+  text-transform: uppercase;
+}
+
+.mp-menu__link {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.mp-menu__code-box {
+  margin: 1rem 0 1.5rem;
+  padding: 1rem;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 2px dashed rgba(129, 212, 250, 0.5);
+}
+
+.mp-menu__code-label {
+  display: block;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 0.35rem;
+}
+
+.mp-menu__code {
+  display: block;
+  font-size: 2.5rem;
+  font-weight: 900;
+  letter-spacing: 0.25em;
+  color: #ffd54f;
+}
+
+.mp-menu__code-hint {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.mp-menu__status {
+  color: #a5d6a7;
+  margin: 0 0 1rem;
+}
+
+.mp-menu__error {
+  color: #ef9a9a;
+  margin: 0 0 1rem;
+}

@@ -1,0 +1,146 @@
+.ability-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: fade-in 0.2s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ability-modal {
+  background: linear-gradient(145deg, #1e2a3a, #121820);
+  border: 2px solid rgba(76, 175, 80, 0.5);
+  border-radius: 12px;
+  padding: 20px;
+  min-width: 280px;
+  max-width: 360px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  animation: slide-up 0.25s ease;
+}
+
+@keyframes slide-up {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.ability-modal__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.ability-modal__header h3 {
+  margin: 0;
+  flex: 1;
+  color: #81c784;
+}
+
+.ability-modal__hp {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.ability-modal__close {
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.ability-modal__close:hover {
+  color: #fff;
+}
+
+.ability-modal__hint {
+  margin: 0 0 16px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.ability-modal__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ability-modal__ability {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #eee;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  text-align: left;
+  width: 100%;
+}
+
+.ability-modal__ability--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ability-modal__ability-desc {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.ability-modal__cd {
+  font-size: 0.7rem;
+  color: #ffb74d;
+  font-weight: 700;
+}
+
+.ability-modal__statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.status-badge {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.status-badge--frozen { background: rgba(33, 150, 243, 0.3); color: #64b5f6; }
+.status-badge--webbed { background: rgba(158, 158, 158, 0.3); color: #e0e0e0; }
+.status-badge--burn { background: rgba(255, 87, 34, 0.3); color: #ff7043; }
+.status-badge--infect { background: rgba(156, 39, 176, 0.3); color: #ce93d8; }
+.status-badge--half_damage { background: rgba(255, 235, 59, 0.2); color: #fff176; }
+.status-badge--attack_immune { background: rgba(255, 235, 59, 0.25); color: #ffeb3b; }
+.status-badge--haunt { background: rgba(126, 87, 194, 0.3); color: #b388ff; }
+
+.ability-modal__ability:hover {
+  background: rgba(76, 175, 80, 0.15);
+  border-color: #4caf50;
+  transform: translateX(4px);
+}
+
+.ability-modal__ability-name {
+  font-weight: 600;
+}
+
+.ability-modal__ability-dmg {
+  font-size: 0.85rem;
+  color: #ef5350;
+  font-weight: 700;
+}

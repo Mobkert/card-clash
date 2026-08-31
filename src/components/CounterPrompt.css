@@ -1,0 +1,116 @@
+.counter-prompt-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 10, 30, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.counter-prompt {
+  background: linear-gradient(145deg, rgba(20, 24, 60, 0.95), rgba(10, 12, 35, 0.98));
+  border: 3px solid rgba(255, 215, 0, 0.45);
+  border-radius: 20px;
+  padding: 2rem 2.5rem;
+  text-align: center;
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(255, 215, 0, 0.15);
+}
+
+.counter-prompt__ring {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 1rem;
+}
+
+.counter-prompt__svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.counter-prompt__track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 6;
+}
+
+.counter-prompt__progress {
+  fill: none;
+  stroke: #ffd700;
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 283;
+  transition: stroke-dashoffset 0.1s linear;
+}
+
+.counter-prompt__timer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #ffd700;
+}
+
+.counter-prompt__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.4rem;
+  color: #fff;
+}
+
+.counter-prompt__desc {
+  margin: 0 0 0.5rem;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.5;
+}
+
+.counter-prompt__hint {
+  margin: 0 0 1.25rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.counter-prompt__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.counter-prompt__btn {
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.counter-prompt__btn:hover {
+  transform: scale(1.03);
+}
+
+.counter-prompt__btn--mirror {
+  background: linear-gradient(135deg, #7e57c2, #4527a0);
+  color: #fff;
+  border-color: #b388ff;
+}
+
+.counter-prompt__btn--spell {
+  background: linear-gradient(135deg, #5c6bc0, #283593);
+  color: #fff;
+  border-color: #9fa8da;
+}
+
+.counter-prompt__btn--chain {
+  background: linear-gradient(135deg, #546e7a, #263238);
+  color: #fff;
+  border-color: #90a4ae;
+}

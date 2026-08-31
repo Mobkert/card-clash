@@ -1,0 +1,89 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 90px;
+  height: 120px;
+  padding: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: #1a1a2e;
+  color: #eee;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  font-family: inherit;
+  text-align: center;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.card--selected {
+  border-color: #ffd700;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.5);
+  transform: translateY(-6px);
+}
+
+.card--small {
+  width: 70px;
+  height: 90px;
+  font-size: 0.75rem;
+  padding: 4px;
+}
+
+.card--character {
+  background: linear-gradient(145deg, #2d4a3e, #1a2e28);
+  border-color: #4caf50;
+}
+
+.card--attack {
+  background: linear-gradient(145deg, #4a2d2d, #2e1a1a);
+  border-color: #f44336;
+}
+
+.card--passive {
+  background: linear-gradient(145deg, #2d3a4a, #1a2430);
+  border-color: #2196f3;
+}
+
+.card--special {
+  background: linear-gradient(145deg, #4a3d2d, #2e281a);
+  border-color: #ff9800;
+}
+
+.card__type {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+.card__name {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.card__detail {
+  font-size: 0.7rem;
+  opacity: 0.85;
+}
+
+.card--hidden {
+  background: linear-gradient(145deg, #37474f, #263238);
+  border-color: #546e7a;
+  cursor: default;
+  pointer-events: none;
+}
+
+.card--hidden .card__name {
+  color: #90a4ae;
+}
+
+.card--hidden:hover {
+  transform: none;
+  box-shadow: none;
+}

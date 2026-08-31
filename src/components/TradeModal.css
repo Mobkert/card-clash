@@ -1,0 +1,62 @@
+.trade-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 150;
+}
+
+.trade-modal {
+  background: #1a1a2e;
+  border: 2px solid #ffc107;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  text-align: center;
+}
+
+.trade-modal h3 {
+  margin: 0 0 8px;
+  color: #ffc107;
+}
+
+.trade-modal p {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
+}
+
+.trade-modal__options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.trade-modal__option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: #eee;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.trade-modal__option:hover {
+  transform: scale(1.02);
+}
+
+.trade-modal__option--damage:hover { border-color: #ef5350; }
+.trade-modal__option--cooldown:hover { border-color: #64b5f6; }
+
+.trade-modal__option span {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.55);
+}
